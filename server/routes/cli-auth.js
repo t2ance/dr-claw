@@ -15,7 +15,7 @@ router.get('/claude/status', async (req, res) => {
       return res.json({
         authenticated: true,
         email: credentialsResult.email || 'Authenticated',
-        method: 'credentials_file'
+        method: 'cli'
       });
     }
 
@@ -75,7 +75,78 @@ router.get('/codex/status', async (req, res) => {
   }
 });
 
-async function checkClaudeCredentials() {
+function checkClaudeCredentials() {
+  return new Promise((resolve) => {
+    let processCompleted = false;
+
+    const timeout = setTimeout(() => {
+      if (!processCompleted) {
+        processCompleted = true;
+        if (childProcess) {
+          childProcess.kill();
+        }
+        // Fall back to credentials file check on timeout
+        checkClaudeCredentialsFile().then(resolve);
+      }
+    }, 5000);
+
+    let childProcess;
+    try {
+      childProcess = spawn('claude', ['auth', 'status', '--json'], {
+        env: { ...process.env, CLAUDECODE: '' }
+      });
+    } catch {
+      clearTimeout(timeout);
+      checkClaudeCredentialsFile().then(resolve);
+      return;
+    }
+
+    let stdout = '';
+    let stderr = '';
+
+    childProcess.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    childProcess.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    childProcess.on('close', (code) => {
+      if (processCompleted) return;
+      processCompleted = true;
+      clearTimeout(timeout);
+
+      if (code === 0 && stdout.trim()) {
+        try {
+          const status = JSON.parse(stdout.trim());
+          if (status.loggedIn) {
+            resolve({
+              authenticated: true,
+              email: status.email || null
+            });
+            return;
+          }
+        } catch {
+          // JSON parse failed, fall through
+        }
+      }
+
+      // CLI check failed, fall back to credentials file
+      checkClaudeCredentialsFile().then(resolve);
+    });
+
+    childProcess.on('error', () => {
+      if (processCompleted) return;
+      processCompleted = true;
+      clearTimeout(timeout);
+      // claude CLI not available, fall back to credentials file
+      checkClaudeCredentialsFile().then(resolve);
+    });
+  });
+}
+
+async function checkClaudeCredentialsFile() {
   try {
     const credPath = path.join(os.homedir(), '.claude', '.credentials.json');
     const content = await fs.readFile(credPath, 'utf8');

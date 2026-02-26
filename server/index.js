@@ -1355,6 +1355,7 @@ function handleShellConnection(ws) {
                 // Login commands (Claude/Cursor auth) should never reuse cached sessions
                 const isLoginCommand = initialCommand && (
                     initialCommand.includes('setup-token') ||
+                    initialCommand.includes('/login') ||
                     isCursorLoginCommand(initialCommand) ||
                     initialCommand.includes('auth login')
                 );
