@@ -1,6 +1,6 @@
 # Changelog
 
-## v2026.3.0 - 2026-03-04
+## v2026.3.4 - 2026-03-04
 
 ### Highlights
 - Added a guided starter flow in Chat with skill-aware prompt templates to improve first-run onboarding and task kickoff.
