@@ -126,6 +126,22 @@ function classifyArtifact(name, relativePath) {
     if (name.startsWith('machine_learning')) return { stage: 'ML Development', icon: Beaker, color: 'orange' };
     return { stage: 'Experiment Analysis', icon: Beaker, color: 'teal' };
   }
+  if (
+    rp.startsWith('Promotion/')
+    || rp.startsWith('Presentation/')
+    || rp.startsWith('Publication/homepage/')
+    || rp.startsWith('Publication/slide/')
+  ) {
+    if (rp.includes('/homepage/'))
+      return { stage: 'Homepage Delivery', icon: FileText, color: 'pink' };
+    if (rp.includes('slides/') || rp.includes('/slide/') || name.endsWith('.png') || name.endsWith('.jpg'))
+      return { stage: 'Slide Generation', icon: FileText, color: 'pink' };
+    if (name.endsWith('.mp3') || name.endsWith('.wav'))
+      return { stage: 'TTS Audio', icon: FileText, color: 'pink' };
+    if (name.endsWith('.mp4'))
+      return { stage: 'Video Assembly', icon: FileText, color: 'pink' };
+    return { stage: 'Slide Generation', icon: FileText, color: 'pink' };
+  }
   if (rp.startsWith('Publication/')) {
     return { stage: 'Paper Writing', icon: PenTool, color: 'purple' };
   }
@@ -162,6 +178,7 @@ const BADGE_COLORS = {
   yellow: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300',
   teal: 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300',
   gray: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
+  pink: 'bg-pink-100 text-pink-800 dark:bg-pink-900/40 dark:text-pink-300',
 };
 
 const IDEATION_STAGES = new Set([
@@ -183,13 +200,15 @@ const EXPERIMENT_STAGES = new Set([
 ]);
 
 const PUBLICATION_STAGES = new Set(['Paper Writing']);
+const PRESENTATION_STAGES = new Set(['Homepage Delivery', 'Slide Generation', 'TTS Audio', 'Video Assembly']);
 const DEFAULT_RESEARCH_BRIEF_FILENAME = 'research_brief.json';
 const DEFAULT_TASKS_FILENAME = 'tasks.json';
-const TASK_STAGE_ORDER = ['ideation', 'experiment', 'publication', 'unassigned'];
+const TASK_STAGE_ORDER = ['ideation', 'experiment', 'publication', 'promotion', 'unassigned'];
 const TASK_STAGE_META = {
   ideation: { label: 'Ideation', className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' },
   experiment: { label: 'Experiment', className: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300' },
   publication: { label: 'Publication', className: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300' },
+  promotion: { label: 'Promotion', className: 'bg-pink-100 text-pink-800 dark:bg-pink-900/40 dark:text-pink-300' },
   unassigned: { label: 'Unassigned', className: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' },
 };
 const TASK_STATUS_META = {
@@ -360,6 +379,7 @@ function StageSection({ title, icon: Icon, badgeClass, expanded, onToggle, child
 }
 
 function TaskPipelineBoard({ tasks, isLoading, onNavigateToChat, projectName, onTaskUpdated }) {
+  const { t } = useTranslation('common');
   const [openStages, setOpenStages] = useState({});
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [editForm, setEditForm] = useState({ title: '', description: '' });
@@ -457,14 +477,16 @@ function TaskPipelineBoard({ tasks, isLoading, onNavigateToChat, projectName, on
   useEffect(() => {
     setOpenStages((prev) => {
       if (Object.keys(prev).length > 0) return prev;
-      return { ideation: true, experiment: true, publication: true, unassigned: false };
+      return { ideation: true, experiment: true, publication: true, promotion: true, unassigned: false };
     });
   }, [tasks]);
 
   const normalizedTasks = useMemo(
     () => (Array.isArray(tasks) ? tasks : []).map((task) => ({
       ...task,
-      stage: TASK_STAGE_META[task?.stage] ? task.stage : 'unassigned',
+      stage: task?.stage === 'presentation'
+        ? 'promotion'
+        : (TASK_STAGE_META[task?.stage] ? task.stage : 'unassigned'),
       status: TASK_STATUS_META[task?.status] ? task.status : 'pending',
     })),
     [tasks],
@@ -484,6 +506,7 @@ function TaskPipelineBoard({ tasks, isLoading, onNavigateToChat, projectName, on
       ideation: [],
       experiment: [],
       publication: [],
+      promotion: [],
       unassigned: [],
     };
     normalizedTasks.forEach((task) => {
@@ -673,121 +696,141 @@ function TaskPipelineBoard({ tasks, isLoading, onNavigateToChat, projectName, on
                           const statusMeta = TASK_STATUS_META[task.status] || TASK_STATUS_META.pending;
                           const isFirstPendingTask = task.status === 'pending' && String(task.id) === firstPendingTaskId;
                           const isEditing = editingTaskId === String(task.id);
+                          const cardTone = task.status === 'done'
+                            ? 'border-emerald-200/80 bg-emerald-50/40 dark:border-emerald-900/70 dark:bg-emerald-950/20'
+                            : task.status === 'in-progress'
+                              ? 'border-blue-200/80 bg-blue-50/40 dark:border-blue-900/70 dark:bg-blue-950/20'
+                              : 'border-slate-200/80 bg-slate-50/40 dark:border-slate-800 dark:bg-slate-950/20';
                           return (
                             <React.Fragment key={`${stage}-${task.id}`}>
-                              <div
-                                className={`group px-3 py-2 border-b border-border last:border-b-0 ${!isEditing ? 'cursor-pointer hover:bg-muted/30' : ''}`}
-                                onDoubleClick={!isEditing ? () => handleDoubleClick(task) : undefined}
-                                title={!isEditing ? 'Double-click to edit' : undefined}
-                              >
-                                <div className="flex items-start gap-2">
-                                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground mt-0.5">#{task.id}</span>
-                                  <div className="min-w-0 flex-1">
-                                    {isEditing ? (
-                                      <div className="space-y-1.5">
-                                        <input
-                                          type="text"
-                                          className="w-full text-sm font-medium text-foreground bg-background border border-border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-cyan-500"
-                                          value={editForm.title}
-                                          onChange={(e) => setEditForm((prev) => ({ ...prev, title: e.target.value }))}
-                                          onKeyDown={(e) => {
-                                            if (e.key === 'Enter') { e.preventDefault(); handleSave(); }
-                                            if (e.key === 'Escape') handleCancel();
-                                          }}
+                            <div
+                              className={`group mx-2 my-2 rounded-xl border px-3 py-2.5 transition-all ${
+                                isFirstPendingTask && !isEditing ? 'ring-1 ring-emerald-300/60 dark:ring-emerald-700/60' : ''
+                              } ${cardTone} ${!isEditing ? 'cursor-pointer hover:shadow-sm hover:border-cyan-300/70 dark:hover:border-cyan-800/70' : 'border-cyan-400/70 dark:border-cyan-700/70 bg-cyan-50/40 dark:bg-cyan-950/20'}`}
+                              onDoubleClick={!isEditing ? () => handleDoubleClick(task) : undefined}
+                              title={!isEditing ? t('researchLabTaskBoard.doubleClickToEdit') : undefined}
+                            >
+                              <div className="flex items-start gap-2">
+                                <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-background/90 border border-border text-muted-foreground mt-0.5">#{task.id}</span>
+                                <div className="min-w-0 flex-1">
+                                  {isEditing ? (
+                                    <div className="space-y-1.5">
+                                      <input
+                                        type="text"
+                                        className="w-full text-sm font-medium text-foreground bg-background border border-border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                                        value={editForm.title}
+                                        onChange={(e) => setEditForm((prev) => ({ ...prev, title: e.target.value }))}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') { e.preventDefault(); handleSave(); }
+                                          if (e.key === 'Escape') handleCancel();
+                                        }}
+                                        disabled={saving}
+                                        autoFocus
+                                        placeholder={t('researchLabTaskBoard.taskTitlePlaceholder')}
+                                      />
+                                      <textarea
+                                        className="w-full text-xs text-muted-foreground bg-background border border-border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-cyan-500 resize-y min-h-[2.5rem]"
+                                        value={editForm.description}
+                                        onChange={(e) => setEditForm((prev) => ({ ...prev, description: e.target.value }))}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSave(); }
+                                          if (e.key === 'Escape') handleCancel();
+                                        }}
+                                        disabled={saving}
+                                        rows={2}
+                                        placeholder={t('researchLabTaskBoard.taskDescriptionPlaceholder')}
+                                      />
+                                      <div className="flex items-center gap-1.5">
+                                        <Button
+                                          size="sm"
+                                          className="h-6 px-2 text-[10px]"
+                                          onClick={handleSave}
                                           disabled={saving}
-                                          autoFocus
-                                          placeholder="Task title"
-                                        />
-                                        <textarea
-                                          className="w-full text-xs text-muted-foreground bg-background border border-border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-cyan-500 resize-y min-h-[2.5rem]"
-                                          value={editForm.description}
-                                          onChange={(e) => setEditForm((prev) => ({ ...prev, description: e.target.value }))}
-                                          onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSave(); }
-                                            if (e.key === 'Escape') handleCancel();
-                                          }}
-                                          disabled={saving}
-                                          rows={2}
-                                          placeholder="Task description"
-                                        />
-                                        <div className="flex items-center gap-1.5">
-                                          <Button
-                                            size="sm"
-                                            className="h-6 px-2 text-[10px]"
-                                            onClick={handleSave}
-                                            disabled={saving}
-                                          >
-                                            <Check className="w-3 h-3 mr-1" />
-                                            {saving ? 'Saving...' : 'Save'}
-                                          </Button>
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-6 px-2 text-[10px]"
-                                            onClick={handleCancel}
-                                            disabled={saving}
-                                          >
-                                            Cancel
-                                          </Button>
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <>
-                                        <p className="text-sm font-medium text-foreground truncate">{task.title || 'Untitled Task'}</p>
-                                        {task.description && (
-                                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{task.description}</p>
-                                        )}
-                                      </>
-                                    )}
-                                    {!isEditing && Array.isArray(task.suggestedSkills) && task.suggestedSkills.length > 0 && (
-                                      <div className="flex flex-wrap gap-1 mt-1.5">
-                                        {task.suggestedSkills.slice(0, 3).map((skill) => (
-                                          <span key={`${task.id}-${skill}`} className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300">
-                                            {skill}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                  {!isEditing && (
-                                    <div className="flex flex-col items-end gap-1">
-                                      <div className="flex items-center gap-1">
-                                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${statusMeta.className}`}>{statusMeta.label}</span>
-                                        <button
-                                          type="button"
-                                          onClick={(e) => { e.stopPropagation(); setDeleteConfirmTask(task); }}
-                                          className="p-0.5 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-muted-foreground hover:text-red-600 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                          title="Delete task"
                                         >
-                                          <Trash2 className="w-3 h-3" />
-                                        </button>
+                                          <Check className="w-3 h-3 mr-1" />
+                                          {saving ? t('researchLabTaskBoard.saving') : t('buttons.save')}
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-6 px-2 text-[10px]"
+                                          onClick={handleCancel}
+                                          disabled={saving}
+                                        >
+                                          {t('buttons.cancel')}
+                                        </Button>
                                       </div>
-                                      {isFirstPendingTask && onNavigateToChat && (
-                                        <div className="mt-0.5 inline-flex flex-col items-end gap-1">
-                                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 animate-pulse">
-                                            Next
-                                          </span>
-                                          <Button
-                                            size="sm"
-                                            className="h-7 px-2.5 text-[11px] font-semibold text-white bg-gradient-to-r from-cyan-500 via-sky-500 to-emerald-500 hover:from-cyan-400 hover:via-sky-400 hover:to-emerald-400 shadow-[0_0_0_1px_rgba(255,255,255,0.2),0_8px_18px_rgba(16,185,129,0.35)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_8px_20px_rgba(34,211,238,0.35)] transition-all"
-                                            onClick={() => onNavigateToChat()}
-                                          >
-                                            <Sparkles className="w-3 h-3 mr-1.5" />
-                                            <MessageSquare className="w-3 h-3 mr-1" />
-                                            Go to Chat
-                                          </Button>
-                                        </div>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <p className="text-sm font-semibold text-foreground line-clamp-2">{task.title || t('researchLabTaskBoard.untitledTask')}</p>
+                                      {task.description && (
+                                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{task.description}</p>
                                       )}
-                                      {task.status === 'in-progress' && (
-                                        <span className="text-[10px] text-blue-600 dark:text-blue-300 inline-flex items-center gap-1">
-                                          <Clock3 className="w-3 h-3" />
-                                          Active
+                                      <p className="text-[10px] text-muted-foreground/80 mt-1 inline-flex items-center gap-1">
+                                        <PenTool className="w-3 h-3" />
+                                        {t('researchLabTaskBoard.editHint')}
+                                      </p>
+                                    </>
+                                  )}
+                                  {!isEditing && Array.isArray(task.suggestedSkills) && task.suggestedSkills.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1.5">
+                                      {task.suggestedSkills.slice(0, 3).map((skill) => (
+                                        <span key={`${task.id}-${skill}`} className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300">
+                                          {skill}
                                         </span>
-                                      )}
+                                      ))}
                                     </div>
                                   )}
                                 </div>
+                                {!isEditing && (
+                                  <div className="flex flex-col items-end gap-1">
+                                    <div className="flex items-center gap-1">
+                                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${statusMeta.className}`}>{statusMeta.label}</span>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 px-2 text-[10px] border border-border/70 hover:border-cyan-400/70"
+                                        onClick={() => handleDoubleClick(task)}
+                                      >
+                                        <PenTool className="w-3 h-3 mr-1" />
+                                        {t('buttons.edit')}
+                                      </Button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); setDeleteConfirmTask(task); }}
+                                        className="p-0.5 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-muted-foreground hover:text-red-600 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        title="Delete task"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                    {isFirstPendingTask && onNavigateToChat && (
+                                      <div className="mt-0.5 inline-flex flex-col items-end gap-1">
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 animate-pulse">
+                                          Next
+                                        </span>
+                                        <Button
+                                          size="sm"
+                                          className="h-7 px-2.5 text-[11px] font-semibold text-white bg-gradient-to-r from-cyan-500 via-sky-500 to-emerald-500 hover:from-cyan-400 hover:via-sky-400 hover:to-emerald-400 shadow-[0_0_0_1px_rgba(255,255,255,0.2),0_8px_18px_rgba(16,185,129,0.35)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_8px_20px_rgba(34,211,238,0.35)] transition-all"
+                                          onClick={() => onNavigateToChat()}
+                                        >
+                                          <Sparkles className="w-3 h-3 mr-1.5" />
+                                          <MessageSquare className="w-3 h-3 mr-1" />
+                                          Go to Chat
+                                        </Button>
+                                      </div>
+                                    )}
+                                    {task.status === 'in-progress' && (
+                                      <span className="text-[10px] text-blue-600 dark:text-blue-300 inline-flex items-center gap-1">
+                                        <Clock3 className="w-3 h-3" />
+                                        Active
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                               </div>
+                            </div>
                               {/* Insertion point after this task */}
                               {renderInsertionPoint(task.id, `${stage}-insert-after-${task.id}`)}
                             </React.Fragment>
@@ -918,6 +961,32 @@ const ideaMarkdownComponents = {
   ul: ({ children }) => <ul className="list-disc list-inside text-sm text-foreground/85 mb-2 space-y-0.5 ml-2">{children}</ul>,
   ol: ({ children }) => <ol className="list-decimal list-inside text-sm text-foreground/85 mb-2 space-y-0.5 ml-2">{children}</ol>,
   li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+  blockquote: ({ children }) => (
+    <blockquote className="border-l-4 border-blue-300 dark:border-blue-600 pl-3 italic text-foreground/70 my-2 text-sm">{children}</blockquote>
+  ),
+  a: ({ href, children }) => (
+    <a href={href} className="text-blue-600 dark:text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">{children}</a>
+  ),
+  code: ({ inline, className, children, ...props }) => {
+    if (inline) {
+      return <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono text-foreground">{children}</code>;
+    }
+    const lang = (className || '').replace('language-', '');
+    return (
+      <div className="my-2 rounded-lg overflow-hidden border border-border">
+        {lang && <div className="bg-muted/60 px-3 py-1 text-xs text-muted-foreground font-mono border-b border-border">{lang}</div>}
+        <pre className="bg-muted/30 p-3 overflow-x-auto text-xs">
+          <code className="font-mono text-foreground/90">{children}</code>
+        </pre>
+      </div>
+    );
+  },
+  strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+  em: ({ children }) => <em className="italic">{children}</em>,
+};
+
+/** Markdown component overrides */
+const markdownComponents = {
   blockquote: ({ children }) => (
     <blockquote className="border-l-4 border-blue-300 dark:border-blue-600 pl-3 italic text-foreground/70 my-2 text-sm">{children}</blockquote>
   ),
@@ -1445,6 +1514,10 @@ function ResearchLab({ selectedProject, onNavigateToChat }) {
       }
 
       const logFiles = collectFiles(tree, projectRoot, (rel) => {
+        // Promotion: collect all files under Promotion/ and legacy Presentation/.
+        if (/^(Promotion|Presentation)\//.test(rel)) return true;
+        // Legacy publication outputs that now belong to Promotion.
+        if (/^Publication\/(homepage|slide)\//.test(rel)) return true;
         if (!rel.endsWith('.json')) return false;
         // New layout: JSON files inside logs/ dirs under Ideation/ or Experiment/
         if (/^(Ideation|Experiment)\/.*\/logs\//.test(rel)) return true;
