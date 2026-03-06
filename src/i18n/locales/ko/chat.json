@@ -262,7 +262,7 @@
   },
   "guidedStarter": {
     "title": "지금 무엇을 하고 싶나요?",
-    "description": "먼저 연구 작업 유형을 고르고, 스킬을 선택하면 구조화된 프롬프트 템플릿이 자동으로 채워집니다.",
+    "description": "연구 작업 유형 하나를 고르면 구조화된 프롬프트 템플릿이 자동으로 채워집니다.",
     "refresh": "랜덤 변경",
     "recommendedSkills": "이 옵션의 추천 스킬",
     "loadingSkills": "사용 가능한 스킬을 확인하는 중...",

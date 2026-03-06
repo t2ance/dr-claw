@@ -262,7 +262,7 @@
   },
   "guidedStarter": {
     "title": "你现在想做什么？",
-    "description": "先选择一个研究任务方向，再选择技能，一键生成结构化提问模板。",
+    "description": "选择一个研究任务方向，即可一键生成结构化提问模板。",
     "refresh": "随机换一组",
     "recommendedSkills": "该方向推荐 Skills",
     "loadingSkills": "正在检测可用 Skills...",

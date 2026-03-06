@@ -262,7 +262,7 @@
   },
   "guidedStarter": {
     "title": "What do you want to do today?",
-    "description": "Pick one research option first. Then choose a skill to auto-fill a structured prompt template.",
+    "description": "Pick one research option to auto-fill a structured prompt template.",
     "refresh": "Randomize",
     "recommendedSkills": "Recommended skills for this option",
     "loadingSkills": "Checking available skills...",

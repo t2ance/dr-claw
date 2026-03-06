@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Compass, Shuffle, Sparkles } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Compass, Shuffle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
   GUIDED_PROMPT_SCENARIOS,
@@ -86,7 +86,6 @@ export default function GuidedPromptStarter({
   const [examples, setExamples] = useState(() => resolveInitialExamples(projectName));
   const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(null);
   const [availableSkills, setAvailableSkills] = useState<Set<string> | null>(null);
-  const [isLoadingSkills, setIsLoadingSkills] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,7 +111,6 @@ export default function GuidedPromptStarter({
     };
 
     const fetchSkills = async () => {
-      setIsLoadingSkills(true);
       try {
         const response = await api.getGlobalSkills();
         if (!response.ok) {
@@ -125,10 +123,6 @@ export default function GuidedPromptStarter({
         }
       } catch {
         // Keep static list as fallback.
-      } finally {
-        if (!cancelled) {
-          setIsLoadingSkills(false);
-        }
       }
     };
 
@@ -137,22 +131,6 @@ export default function GuidedPromptStarter({
       cancelled = true;
     };
   }, []);
-
-  const selectedScenario = useMemo(
-    () => examples.find((item) => item.id === selectedScenarioId) ?? null,
-    [examples, selectedScenarioId],
-  );
-
-  const availableScenarioSkills = useMemo(() => {
-    if (!selectedScenario) {
-      return [];
-    }
-    if (!availableSkills) {
-      return selectedScenario.skills;
-    }
-    const matched = selectedScenario.skills.filter((skill) => availableSkills.has(skill.toLowerCase()));
-    return matched.length > 0 ? matched : selectedScenario.skills;
-  }, [availableSkills, selectedScenario]);
 
   const injectTemplate = (scenario: GuidedPromptScenario, skills: string[]) => {
     const nextValue = buildTemplate(t, scenario, skills);
@@ -164,6 +142,14 @@ export default function GuidedPromptStarter({
       const cursor = nextValue.length;
       el.setSelectionRange(cursor, cursor);
     }, 100);
+  };
+
+  const handleScenarioSelect = (scenario: GuidedPromptScenario) => {
+    setSelectedScenarioId(scenario.id);
+    const matchedSkills = availableSkills
+      ? scenario.skills.filter((skill) => availableSkills.has(skill.toLowerCase()))
+      : [];
+    injectTemplate(scenario, matchedSkills.length > 0 ? matchedSkills : scenario.skills);
   };
 
   const handleRefreshExamples = () => {
@@ -206,7 +192,7 @@ export default function GuidedPromptStarter({
             <button
               key={scenario.id}
               type="button"
-              onClick={() => setSelectedScenarioId(scenario.id)}
+              onClick={() => handleScenarioSelect(scenario)}
               className={`rounded-xl border p-3 text-left transition-colors ${
                 isActive
                   ? 'border-cyan-400/60 bg-cyan-500/10 ring-1 ring-cyan-400/20'
@@ -224,45 +210,6 @@ export default function GuidedPromptStarter({
           );
         })}
       </div>
-
-      {selectedScenario && (
-        <div className="mt-3 rounded-xl border border-cyan-200/60 dark:border-cyan-900/40 bg-white/75 dark:bg-white/5 p-3">
-          <p className="text-xs font-medium text-muted-foreground mb-2">
-            {t('guidedStarter.recommendedSkills')}
-          </p>
-          {isLoadingSkills && (
-            <p className="mb-2 text-[11px] text-muted-foreground">
-              {t('guidedStarter.loadingSkills')}
-            </p>
-          )}
-          <div className="flex flex-wrap gap-2">
-            {availableScenarioSkills.map((skill) => (
-              <button
-                key={skill}
-                type="button"
-                onClick={() => injectTemplate(selectedScenario, [skill])}
-                className="rounded-full border border-cyan-200/70 dark:border-cyan-800/50 bg-white/90 dark:bg-white/5 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-cyan-50 dark:hover:bg-cyan-900/20 transition-colors"
-              >
-                {skill}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => injectTemplate(selectedScenario, availableScenarioSkills)}
-              disabled={availableScenarioSkills.length === 0}
-              className="inline-flex items-center gap-1 rounded-full border border-cyan-400/50 px-2.5 py-1 text-xs font-medium text-white bg-gradient-to-r from-cyan-500 via-sky-500 to-emerald-500 hover:from-cyan-400 hover:via-sky-400 hover:to-emerald-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Sparkles className="w-3 h-3" />
-              {t('guidedStarter.useAllSkills')}
-            </button>
-          </div>
-          {!isLoadingSkills && availableSkills && selectedScenario.skills.length > 0 && selectedScenario.skills.every((skill) => !availableSkills.has(skill.toLowerCase())) && (
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              {t('guidedStarter.noAvailableSkillsFallback')}
-            </p>
-          )}
-        </div>
-      )}
     </div>
   );
 }
