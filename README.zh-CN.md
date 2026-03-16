@@ -31,10 +31,13 @@
 - [Overview](#overview)
 - [亮点](#亮点)
 - [快速开始](#快速开始)
-- [从 VibeLab 迁移](#从-vibelab-迁移)
 - [配置说明](#配置说明)
 - [Research Lab - 快速示例](#research-lab-quick-example)
 - [使用指南](#使用指南)
+- [移动端与平板](#移动端与平板)
+- [架构](#架构)
+- [安全与工具配置](#安全与工具配置)
+- [贡献](#贡献)
 - [FAQ](./docs/faq.zh-CN.md)
 - [许可证](#许可证)
 - [致谢](#致谢)
@@ -106,29 +109,6 @@ npm run dev
 
 如果后续 Agent 网页搜索不可用，请查看下方的**网页搜索排障**。
 
-## 从 VibeLab 迁移
-
-如果你之前使用的是 `VibeLab`：
-
-1. **如果你已经克隆过仓库，请更新本地 git remote：**
-```bash
-git remote set-url origin git@github.com:OpenLAIR/dr-claw.git
-# 或：git remote set-url origin https://github.com/OpenLAIR/dr-claw.git
-```
-
-2. **如果你全局安装过 npm CLI，请更新全局安装：**
-```bash
-npm install -g dr-claw@latest
-```
-
-3. **把自动化脚本和命令习惯从 `vibelab` 切换到 `dr-claw`。**
-   旧的 `vibelab` 命令在过渡期仍然可用，但现在只是兼容别名。
-
-4. **先启动一次 Dr. Claw，让迁移逻辑自动执行。**
-   旧的认证数据、本地 UI 偏好，以及原来位于 `~/vibelab` 下的项目，会在可行时自动迁移或自动识别。
-
-如果首次启动后仍然看不到旧项目，请在项目选择器中手动添加，或临时把 `WORKSPACES_ROOT` 指向旧目录。
-
 ## 配置说明
 
 Dr. Claw 会从 `.env` 读取本地配置。对大多数用户来说，只需要把 `.env.example` 复制为 `.env`；但以下几个配置项最常需要尽早调整：
@@ -160,7 +140,8 @@ Dr. Claw 的核心功能是 **Research Lab**。
 
 启动 Dr. Claw 后，打开浏览器并按以下步骤操作。
 
-### 第 1 步 — 创建或打开项目
+<details>
+<summary><strong>第 1 步 — 创建或打开项目</strong></summary>
 
 首次打开 Dr. Claw 时，您会看到 **Projects** 侧边栏。您有两种选择：
 
@@ -169,7 +150,10 @@ Dr. Claw 的核心功能是 **Research Lab**。
 
 > **默认项目存储路径：** 新项目默认存储在 `~/dr-claw` 目录下。可在 **Settings → Appearance → Default Project Path** 中修改，也可通过环境变量 `WORKSPACES_ROOT` 设置。该配置持久化在 `~/.claude/project-config.json` 中。
 
-### 第 2 步 — 通过 Chat 生成研究流水线
+</details>
+
+<details>
+<summary><strong>第 2 步 — 通过 Chat 生成研究流水线</strong></summary>
 
 创建或打开项目后，Dr. Claw 默认进入 **Chat** 页面。如果尚未生成研究流水线，页面会显示引导提示，并提供 **Use in Chat** 按钮注入模板提示。
 
@@ -177,14 +161,20 @@ Dr. Claw 的核心功能是 **Research Lab**。
 - `.pipeline/docs/research_brief.json`（结构化研究简报）
 - `.pipeline/tasks/tasks.json`（任务流水线）
 
-### 第 3 步 — 在 Research Lab 查看并执行任务
+</details>
+
+<details>
+<summary><strong>第 3 步 — 在 Research Lab 查看并执行任务</strong></summary>
 
 切换到 **Research Lab** 查看生成的任务、进度指标和研究产物，然后执行任务：
 1. 通过 **CLI 选择器** 选择后端（Claude Code、Gemini CLI 或 Codex）。
 2. 在 **Research Lab** 中对 pending 任务点击 **Go to Chat** 或 **Use in Chat**。
 3. Agent 执行任务并将结果写回项目。
 
-### 第 4 步 — 网页搜索排障
+</details>
+
+<details>
+<summary><strong>第 4 步 — 网页搜索排障</strong></summary>
 
 如果 Agent 不能搜索网页，通常是当前权限设置过于严格。除此之外，也需要确认当前进程是否仍然启用了运行时网络锁。
 
@@ -217,7 +207,10 @@ Codex 权限模式说明：
 - 仅在可信项目/环境中使用更宽松的权限设置。
 - 完成网页搜索后，建议切回更安全的设置。
 
-### 第 5 步 — 解决"Workspace Trust"或首次运行错误
+</details>
+
+<details>
+<summary><strong>第 5 步 — 解决"Workspace Trust"或首次运行错误</strong></summary>
 
 每个 Agent 首次在项目目录中执行代码时，可能需要进行一次性的信任确认或登录。如果 Chat 窗口卡住或弹出信任/认证提示，请切换到 Dr. Claw 内置的 **Shell** 标签页，在那里同意提示即可。
 
@@ -245,14 +238,20 @@ Dr. Claw 默认已经开启 trust 流程，因此通常**不需要**再手动输
 | **Files** | 浏览、打开、创建、重命名和编辑项目文件，并支持语法高亮。 |
 | **Git** | 不离开应用即可查看差异、暂存更改、提交和切换分支。 |
 
-#### 研究技能（Skills）
+</details>
+
+<details>
+<summary><strong>研究技能（Skills）</strong></summary>
 
 Dr. Claw 当前以生成后的 **Pipeline Task List** 作为执行流水线。
 项目内置了 **100+ 个 skills**（位于 `skills/`），用于辅助科研任务，包括 idea 探索、代码调研、实验开发/分析、论文写作、审阅与交付等。
 Agent 会自动发现这些 skills，并在任务执行过程中按需调用。
 
+</details>
+
+## 移动端与平板
 <details>
-<summary><span style="font-size: 1.17em; font-weight: 600;">移动端与平板</span></summary>
+<summary><span style="font-size: 1.17em; font-weight: 600;">展开内容</span></summary>
 
 Dr. Claw 完全响应式设计。在移动设备上：
 
@@ -262,8 +261,9 @@ Dr. Claw 完全响应式设计。在移动设备上：
 
 </details>
 
+## 架构
 <details>
-<summary><span style="font-size: 1.17em; font-weight: 600;">架构</span></summary>
+<summary><span style="font-size: 1.17em; font-weight: 600;">展开内容</span></summary>
 
 ### 系统概览
 
@@ -287,8 +287,9 @@ Dr. Claw 完全响应式设计。在移动设备上：
 
 </details>
 
+## 安全与工具配置
 <details>
-<summary><span style="font-size: 1.17em; font-weight: 600;">安全与工具配置</span></summary>
+<summary><span style="font-size: 1.17em; font-weight: 600;">展开内容</span></summary>
 
 **🔒 重要提示**: 各 Agent 的权限都是按提供方独立配置的。在开启宽松的文件、Shell 或网页访问前，请先检查 **Settings → Permissions**。
 
@@ -305,8 +306,9 @@ Dr. Claw 完全响应式设计。在移动设备上：
 
 </details>
 
+## 贡献
 <details>
-<summary><span style="font-size: 1.17em; font-weight: 600;">贡献</span></summary>
+<summary><span style="font-size: 1.17em; font-weight: 600;">展开内容</span></summary>
 
 我们欢迎贡献！请遵循以下指南：
 

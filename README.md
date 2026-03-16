@@ -31,10 +31,13 @@
 - [Overview](#overview)
 - [Highlights](#highlights)
 - [Quick Start](#quick-start)
-- [Migrating From VibeLab](#migrating-from-vibelab)
 - [Configuration](#configuration)
 - [Research Lab - Quick Example](#research-lab-quick-example)
 - [Usage Guide](#usage-guide)
+- [Mobile & Tablet](#mobile--tablet)
+- [Architecture](#architecture)
+- [Security & Tools Configuration](#security--tools-configuration)
+- [Contributing](#contributing)
 - [FAQ](./docs/faq.md)
 - [License](#license)
 - [Acknowledgments](#acknowledgments)
@@ -106,29 +109,6 @@ npm run dev
 
 If agent web search does not work later, see **Troubleshooting Web Search** below.
 
-## Migrating From VibeLab
-
-If you used the old `VibeLab` name before the rename:
-
-1. **Update your local git remote** if you already cloned the repo:
-```bash
-git remote set-url origin git@github.com:OpenLAIR/dr-claw.git
-# or: git remote set-url origin https://github.com/OpenLAIR/dr-claw.git
-```
-
-2. **Update your global CLI install** if you installed the npm package globally:
-```bash
-npm install -g dr-claw@latest
-```
-
-3. **Update automation and shell habits** to use `dr-claw` instead of `vibelab`.
-   The legacy `vibelab` command still works during the transition, but it is now only a compatibility alias.
-
-4. **Start Dr. Claw once and let migration run.**
-   Existing auth data, local UI preferences, and former `~/vibelab` projects are migrated or detected automatically when possible.
-
-If an old project does not appear after the first launch, add it manually from the project picker or point `WORKSPACES_ROOT` at the old location temporarily.
-
 ## Configuration
 
 Dr. Claw reads local settings from `.env`. For most users, the only required step is copying `.env.example` to `.env`, but these are the settings you are most likely to adjust early:
@@ -160,7 +140,8 @@ For full step-by-step operations, see **Usage Guide** below.
 
 After starting Dr. Claw, open your browser and follow the steps below.
 
-### Step 1 — Create or Open a Project
+<details>
+<summary><strong>Step 1 — Create or Open a Project</strong></summary>
 
 When you first open Dr. Claw you will see the **Projects** sidebar. You have two options:
 
@@ -169,7 +150,10 @@ When you first open Dr. Claw you will see the **Projects** sidebar. You have two
 
 > **Default project storage path:** New projects are stored under `~/dr-claw` by default. You can change this in **Settings → Appearance → Default Project Path**, or set the `WORKSPACES_ROOT` environment variable. The setting is persisted in `~/.claude/project-config.json`.
 
-### Step 2 — Generate Your Research Pipeline via Chat
+</details>
+
+<details>
+<summary><strong>Step 2 — Generate Your Research Pipeline via Chat</strong></summary>
 
 After creating or opening a project, Dr. Claw opens **Chat** by default. If no research pipeline exists yet, an onboarding banner appears with a **Use in Chat** button that injects a starter prompt.
 
@@ -177,14 +161,20 @@ Describe your research idea — even a rough one is fine. The agent uses the `in
 - `.pipeline/docs/research_brief.json` (your structured research brief)
 - `.pipeline/tasks/tasks.json` (the task pipeline)
 
-### Step 3 — Review in Research Lab and Execute Tasks
+</details>
+
+<details>
+<summary><strong>Step 3 — Review in Research Lab and Execute Tasks</strong></summary>
 
 Switch to **Research Lab** to review the generated tasks, progress metrics, and artifacts. Then execute tasks:
 1. Choose a CLI backend from the **CLI selector** (Claude Code, Gemini CLI, or Codex).
 2. In **Research Lab**, click **Go to Chat** or **Use in Chat** on a pending task.
 3. The agent executes the task and writes results back to the project.
 
-### Step 4 — Troubleshooting Web Search
+</details>
+
+<details>
+<summary><strong>Step 4 — Troubleshooting Web Search</strong></summary>
 
 If the agent cannot search webpages, your current permission settings are likely too restrictive. Also check whether a runtime network lock is still active for the process.
 
@@ -217,7 +207,10 @@ Security note:
 - Use permissive settings only in trusted projects/environments.
 - After finishing web search tasks, switch back to safer settings.
 
-### Step 5 — Resolve "Workspace Trust" or First-Run Errors
+</details>
+
+<details>
+<summary><strong>Step 5 — Resolve "Workspace Trust" or First-Run Errors</strong></summary>
 
 Each agent may require a one-time trust confirmation before it can execute code in your project directory. If Chat freezes or shows a trust prompt, switch to the **Shell** tab inside Dr. Claw and approve the prompt there.
 
@@ -245,14 +238,20 @@ You can switch tabs at any time:
 | **Files** | Browse, open, create, rename, and edit project files with syntax highlighting. |
 | **Git** | Inspect diffs, stage changes, commit, and switch branches without leaving the app. |
 
-#### Research Skills
+</details>
+
+<details>
+<summary><strong>Research Skills</strong></summary>
 
 Dr. Claw now uses the generated **Pipeline Task List** as the execution flow.
 The project includes **100+ skills** under `skills/` to support research tasks (idea exploration, code survey, experiment development/analysis, writing, review, and delivery).
 These skills are discovered by the agent and can be applied as task-level assistance throughout the workflow.
 
+</details>
+
+## Mobile & Tablet
 <details>
-<summary><span style="font-size: 1.17em; font-weight: 600;">Mobile & Tablet</span></summary>
+<summary><span style="font-size: 1.17em; font-weight: 600;">Show details</span></summary>
 
 Dr. Claw is fully responsive. On mobile devices:
 
@@ -262,8 +261,9 @@ Dr. Claw is fully responsive. On mobile devices:
 
 </details>
 
+## Architecture
 <details>
-<summary><span style="font-size: 1.17em; font-weight: 600;">Architecture</span></summary>
+<summary><span style="font-size: 1.17em; font-weight: 600;">Show details</span></summary>
 
 ### System Overview
 
@@ -287,8 +287,9 @@ Dr. Claw is fully responsive. On mobile devices:
 
 </details>
 
+## Security & Tools Configuration
 <details>
-<summary><span style="font-size: 1.17em; font-weight: 600;">Security & Tools Configuration</span></summary>
+<summary><span style="font-size: 1.17em; font-weight: 600;">Show details</span></summary>
 
 **🔒 Important Notice**: Agent permissions are configurable per provider. Review **Settings → Permissions** before enabling broad file, shell, or web access.
 
@@ -305,8 +306,9 @@ To use web and tool-heavy workflows safely:
 
 </details>
 
+## Contributing
 <details>
-<summary><span style="font-size: 1.17em; font-weight: 600;">Contributing</span></summary>
+<summary><span style="font-size: 1.17em; font-weight: 600;">Show details</span></summary>
 
 We welcome contributions! Please follow these guidelines:
 
