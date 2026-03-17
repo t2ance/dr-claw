@@ -5,7 +5,7 @@ import { promises as fs } from 'fs';
 
 import { appSettingsDb, autoResearchDb, userDb } from '../database/db.js';
 import { extractProjectDirectory } from '../projects.js';
-import { queryClaudeSDK, abortClaudeSDKSession } from '../claude-sdk.js';
+import { queryClaudeSDK, abortClaudeSDKSession, isClaudeSDKSessionActive } from '../claude-sdk.js';
 import { sendAutoResearchCompletionEmail } from '../utils/auto-research-mailer.js';
 
 const router = express.Router();
@@ -210,6 +210,34 @@ async function deliverCompletionEmail(runId, userId, projectName) {
   }
 }
 
+function isRunSessionStillActive(run) {
+  const sessionId = run?.session_id;
+  if (!sessionId) {
+    return false;
+  }
+  return isClaudeSDKSessionActive(sessionId);
+}
+
+function reconcileActiveRun(run) {
+  if (!run) {
+    return null;
+  }
+
+  const hasRuntime = activeRuns.has(run.id);
+  const sessionStillActive = isRunSessionStillActive(run);
+  if (hasRuntime || sessionStillActive) {
+    return run;
+  }
+
+  const staleStatus = run.status === 'cancelling' ? 'cancelled' : 'failed';
+  return autoResearchDb.updateRun(run.id, {
+    status: staleStatus,
+    error: run.error || 'Recovered stale Auto Research run after session interruption',
+    currentTaskId: null,
+    finishedAt: run.finished_at || new Date().toISOString(),
+  });
+}
+
 async function runAutoResearch(runId, userId, projectName, projectPath) {
   const runState = activeRuns.get(runId);
   if (!runState) {
@@ -305,7 +333,7 @@ router.get('/:projectName/status', async (req, res) => {
     const projectPath = await extractProjectDirectory(projectName);
     const pipelineState = await readPipelineState(projectPath);
     const profile = userDb.getProfile(userId);
-    const activeRun = autoResearchDb.getActiveRunForProject(userId, projectName);
+    const activeRun = reconcileActiveRun(autoResearchDb.getActiveRunForProject(userId, projectName));
     const latestRun = autoResearchDb.getLatestRunForProject(userId, projectName);
     const eligibility = buildEligibility(profile, pipelineState, activeRun);
 
@@ -390,23 +418,34 @@ router.post('/:projectName/cancel', async (req, res) => {
   try {
     const userId = req.user.id;
     const { projectName } = req.params;
-    const activeRun = autoResearchDb.getActiveRunForProject(userId, projectName);
+    const activeRun = reconcileActiveRun(autoResearchDb.getActiveRunForProject(userId, projectName));
 
     if (!activeRun) {
       return res.status(404).json({ error: 'No active Auto Research run found' });
     }
 
     const runtime = activeRuns.get(activeRun.id);
+    const sessionStillActive = isRunSessionStillActive(activeRun);
     if (runtime) {
       runtime.cancelRequested = true;
-      if (runtime.sessionId) {
-        await abortClaudeSDKSession(runtime.sessionId);
+      if (runtime.sessionId || activeRun.session_id) {
+        await abortClaudeSDKSession(runtime.sessionId || activeRun.session_id);
       }
     }
 
-    const updatedRun = autoResearchDb.updateRun(activeRun.id, {
-      status: 'cancelling',
-    });
+    let updatedRun;
+    if (!runtime && !sessionStillActive) {
+      updatedRun = autoResearchDb.updateRun(activeRun.id, {
+        status: 'cancelled',
+        error: activeRun.error || 'Cancelled after recovering stale Auto Research run',
+        currentTaskId: null,
+        finishedAt: activeRun.finished_at || new Date().toISOString(),
+      });
+    } else {
+      updatedRun = autoResearchDb.updateRun(activeRun.id, {
+        status: 'cancelling',
+      });
+    }
 
     res.json({
       success: true,
