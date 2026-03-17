@@ -6,7 +6,7 @@
 
 <p align="center">
 <a href="https://github.com/OpenLAIR/dr-claw">
-<img src="https://img.shields.io/github/stars/OpenLAIR/dr-claw?style=for-the-badge&logo=github" alt="GitHub Stars" />
+<img src="https://img.shields.io/badge/%F0%9F%A6%9E-Dr.%20Claw-CB2B3E?style=for-the-badge" alt="Dr. Claw" />
 </a>
 <a href="https://github.com/OpenLAIR/dr-claw/blob/main/LICENSE">
 <img src="https://img.shields.io/badge/License-GPL--3.0%20%2B%20AGPL--3.0-blue?style=for-the-badge" alt="License: GPL-3.0 + AGPL-3.0" />
@@ -34,9 +34,7 @@
 - [配置说明](#配置说明)
 - [Research Lab - 快速示例](#research-lab-quick-example)
 - [使用指南](#使用指南)
-- [移动端与平板](#移动端与平板)
-- [架构](#架构)
-- [安全与工具配置](#安全与工具配置)
+- [补充说明](#补充说明)
 - [贡献](#贡献)
 - [FAQ](./docs/faq.zh-CN.md)
 - [许可证](#许可证)
@@ -276,9 +274,11 @@ Agent 会自动发现这些 skills，并在任务执行过程中按需调用。
 
 </details>
 
-## 移动端与平板
+## 补充说明
 <details>
-<summary><span style="font-size: 1.17em; font-weight: 600;">展开内容</span></summary>
+<summary><span style="font-size: 1.17em; font-weight: 600;">移动端、架构与安全配置</span></summary>
+
+### 移动端与平板
 
 Dr. Claw 完全响应式设计。在移动设备上：
 
@@ -286,13 +286,9 @@ Dr. Claw 完全响应式设计。在移动设备上：
 - **滑动手势** — 触摸优化的控制方式
 - **添加到主屏幕** — 可作为 PWA（渐进式 Web 应用）使用
 
-</details>
+### 架构
 
-## 架构
-<details>
-<summary><span style="font-size: 1.17em; font-weight: 600;">展开内容</span></summary>
-
-### 系统概览
+#### 系统概览
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
@@ -302,25 +298,21 @@ Dr. Claw 完全响应式设计。在移动设备上：
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
-### 后端 (Node.js + Express)
+#### 后端 (Node.js + Express)
 - **Express 服务器** - 具有静态文件服务的 RESTful API
 - **WebSocket 服务器** - 用于聊天和项目刷新的通信
 - **Agent 集成 (Claude Code、Gemini CLI、Codex)** - 负责进程拉起、流式输出与会话管理
 - **文件系统 API** - 为项目公开文件浏览器
 
-### 前端 (React + Vite)
+#### 前端 (React + Vite)
 - **React 18** - 带有 hooks 的现代组件架构
 - **CodeMirror** - 具有语法高亮的高级代码编辑器
 
-</details>
-
-## 安全与工具配置
-<details>
-<summary><span style="font-size: 1.17em; font-weight: 600;">展开内容</span></summary>
+### 安全与工具配置
 
 **🔒 重要提示**: 各 Agent 的权限都是按提供方独立配置的。在开启宽松的文件、Shell 或网页访问前，请先检查 **Settings → Permissions**。
 
-### 启用工具
+#### 启用工具
 
 为了安全地使用网页搜索和高权限工具：
 

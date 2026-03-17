@@ -6,7 +6,7 @@
 
 <p align="center">
 <a href="https://github.com/OpenLAIR/dr-claw">
-<img src="https://img.shields.io/github/stars/OpenLAIR/dr-claw?style=for-the-badge&logo=github" alt="GitHub Stars" />
+<img src="https://img.shields.io/badge/%F0%9F%A6%9E-Dr.%20Claw-CB2B3E?style=for-the-badge" alt="Dr. Claw" />
 </a>
 <a href="https://github.com/OpenLAIR/dr-claw/blob/main/LICENSE">
 <img src="https://img.shields.io/badge/License-GPL--3.0%20%2B%20AGPL--3.0-blue?style=for-the-badge" alt="License: GPL-3.0 + AGPL-3.0" />
@@ -34,9 +34,7 @@
 - [Configuration](#configuration)
 - [Research Lab - Quick Example](#research-lab-quick-example)
 - [Usage Guide](#usage-guide)
-- [Mobile & Tablet](#mobile--tablet)
-- [Architecture](#architecture)
-- [Security & Tools Configuration](#security--tools-configuration)
+- [Additional Details](#additional-details)
 - [Contributing](#contributing)
 - [FAQ](./docs/faq.md)
 - [License](#license)
@@ -276,9 +274,11 @@ These skills are discovered by the agent and can be applied as task-level assist
 
 </details>
 
-## Mobile & Tablet
+## Additional Details
 <details>
-<summary><span style="font-size: 1.17em; font-weight: 600;">Show details</span></summary>
+<summary><span style="font-size: 1.17em; font-weight: 600;">Mobile, architecture, and security notes</span></summary>
+
+### Mobile & Tablet
 
 Dr. Claw is fully responsive. On mobile devices:
 
@@ -286,13 +286,9 @@ Dr. Claw is fully responsive. On mobile devices:
 - **Swipe gestures** and touch-optimized controls
 - **Add to Home Screen** to use it as a PWA (Progressive Web App)
 
-</details>
+### Architecture
 
-## Architecture
-<details>
-<summary><span style="font-size: 1.17em; font-weight: 600;">Show details</span></summary>
-
-### System Overview
+#### System Overview
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
@@ -302,25 +298,21 @@ Dr. Claw is fully responsive. On mobile devices:
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
-### Backend (Node.js + Express)
+#### Backend (Node.js + Express)
 - **Express Server** - RESTful API with static file serving
 - **WebSocket Server** - Communication for chats and project refresh
 - **Agent Integration (Claude Code, Gemini CLI, Codex)** - Process spawning, streaming, and session management
 - **File System API** - Exposing file browser for projects
 
-### Frontend (React + Vite)
+#### Frontend (React + Vite)
 - **React 18** - Modern component architecture with hooks
 - **CodeMirror** - Advanced code editor with syntax highlighting
 
-</details>
-
-## Security & Tools Configuration
-<details>
-<summary><span style="font-size: 1.17em; font-weight: 600;">Show details</span></summary>
+### Security & Tools Configuration
 
 **🔒 Important Notice**: Agent permissions are configurable per provider. Review **Settings → Permissions** before enabling broad file, shell, or web access.
 
-### Enabling Tools
+#### Enabling Tools
 
 To use web and tool-heavy workflows safely:
 
