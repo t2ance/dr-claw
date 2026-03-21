@@ -675,7 +675,7 @@ async function saveProjectConfig(config) {
   await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf8');
 }
 
-function encodeProjectPath(projectPath) {
+export function encodeProjectPath(projectPath) {
   return path.resolve(projectPath).replace(/[\\/:\s~_]/g, '-');
 }
 

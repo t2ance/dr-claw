@@ -23,7 +23,6 @@ type TaskMasterSidebarContext = {
 
 function Sidebar({
   projects,
-  trashProjects,
   selectedProject,
   selectedSession,
   onProjectSelect,

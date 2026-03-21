@@ -721,7 +721,6 @@ export function useProjectsState({
   const sidebarSharedProps = useMemo(
     () => ({
       projects,
-      trashProjects,
       selectedProject,
       selectedSession,
       onProjectSelect: handleProjectSelect,
@@ -773,7 +772,6 @@ export function useProjectsState({
       selectedSession,
       settingsInitialTab,
       showSettings,
-      trashProjects,
     ],
   );
 

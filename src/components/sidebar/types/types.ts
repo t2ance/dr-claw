@@ -28,7 +28,6 @@ export type SessionDeleteConfirmation = {
 
 export type SidebarProps = {
   projects: Project[];
-  trashProjects: TrashProject[];
   selectedProject: Project | null;
   selectedSession: ProjectSession | null;
   onProjectSelect: (project: Project) => void;

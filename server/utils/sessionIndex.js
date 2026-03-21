@@ -1,9 +1,5 @@
-import path from 'path';
 import { sessionDb } from '../database/db.js';
-
-function encodeProjectPath(projectPath) {
-  return path.resolve(projectPath).replace(/[\\/:\s~_]/g, '-');
-}
+import { encodeProjectPath } from '../projects.js';
 
 function defaultSessionName(provider) {
   switch (provider) {
@@ -44,4 +40,3 @@ export function recordIndexedSession({
     },
   );
 }
-

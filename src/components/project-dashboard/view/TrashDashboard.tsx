@@ -19,6 +19,7 @@ export default function TrashDashboard({ projects, onRefresh, isLoading = false 
   const { t } = useTranslation(['common', 'sidebar']);
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TrashProject | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(() => new Date());
 
   useEffect(() => {
@@ -27,6 +28,7 @@ export default function TrashDashboard({ projects, onRefresh, isLoading = false 
   }, []);
 
   const handleRestore = async (project: TrashProject) => {
+    setErrorMessage(null);
     setLoadingKey(`restore:${project.name}`);
     try {
       const response = await api.restoreProject(project.name);
@@ -36,13 +38,14 @@ export default function TrashDashboard({ projects, onRefresh, isLoading = false 
       }
       await onRefresh();
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : t('sidebar:messages.deleteProjectError'));
+      setErrorMessage(error instanceof Error ? error.message : t('sidebar:messages.deleteProjectError'));
     } finally {
       setLoadingKey(null);
     }
   };
 
   const handleDelete = async (project: TrashProject, mode: DeleteMode) => {
+    setErrorMessage(null);
     setLoadingKey(`${mode}:${project.name}`);
     try {
       const response = await api.deleteTrashedProject(project.name, mode);
@@ -53,7 +56,7 @@ export default function TrashDashboard({ projects, onRefresh, isLoading = false 
       setDeleteTarget(null);
       await onRefresh();
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : t('sidebar:messages.deleteProjectError'));
+      setErrorMessage(error instanceof Error ? error.message : t('sidebar:messages.deleteProjectError'));
     } finally {
       setLoadingKey(null);
     }
@@ -62,6 +65,11 @@ export default function TrashDashboard({ projects, onRefresh, isLoading = false 
   return (
     <div className="h-full overflow-y-auto bg-gradient-to-b from-background via-background to-muted/20">
       <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
+        {errorMessage && (
+          <div className="mb-4 rounded-2xl border border-red-200 bg-red-50/90 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
+            {errorMessage}
+          </div>
+        )}
         {isLoading ? (
           <div className="rounded-3xl border border-border bg-card/70 px-8 py-16 text-center shadow-sm">
             <div className="mx-auto h-16 w-16 animate-pulse rounded-2xl bg-muted" />
