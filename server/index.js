@@ -1163,6 +1163,7 @@ class WebSocketWriter {
     this.sessionId = null;
     this.isWebSocketWriter = true;  // Marker for transport detection
     this.telemetryContext = telemetryContext;
+    this.projectPath = null;
   }
 
   send(data) {
@@ -1177,8 +1178,16 @@ class WebSocketWriter {
     this.sessionId = sessionId;
   }
 
+  setProjectPath(projectPath) {
+    this.projectPath = projectPath;
+  }
+
   getSessionId() {
     return this.sessionId;
+  }
+
+  getProjectPath() {
+    return this.projectPath;
   }
 }
 
@@ -1334,6 +1343,7 @@ function handleChatConnection(ws, request) {
                     { ...telemetryContext, telemetryEnabled: commandTelemetryEnabled },
                 );
                 writer.telemetryContext = { ...telemetryContext, provider: 'claude', telemetryEnabled: commandTelemetryEnabled };
+                writer.setProjectPath(data.options?.projectPath || data.options?.cwd || null);
 
                 // Use Claude Agents SDK
                 await queryClaudeSDK(data.command, { ...data.options, env: sessionEnv }, writer);
@@ -1355,6 +1365,7 @@ function handleChatConnection(ws, request) {
                     { ...telemetryContext, telemetryEnabled: commandTelemetryEnabled },
                 );
                 writer.telemetryContext = { ...telemetryContext, provider: 'cursor', telemetryEnabled: commandTelemetryEnabled };
+                writer.setProjectPath(data.options?.projectPath || data.options?.cwd || null);
                 await spawnCursor(data.command, { ...data.options, env: sessionEnv }, writer);
             } else if (data.type === 'codex-command') {
                 console.log('[DEBUG] Codex message:', data.command || '[Continue/Resume]');
@@ -1374,6 +1385,7 @@ function handleChatConnection(ws, request) {
                     { ...telemetryContext, telemetryEnabled: commandTelemetryEnabled },
                 );
                 writer.telemetryContext = { ...telemetryContext, provider: 'codex', telemetryEnabled: commandTelemetryEnabled };
+                writer.setProjectPath(data.options?.projectPath || data.options?.cwd || null);
                 await queryCodex(data.command, { ...data.options, env: sessionEnv }, writer);
             } else if (data.type === 'gemini-command') {
                 console.log('[DEBUG] Gemini message:', data.command || '[Continue/Resume]');
@@ -1393,6 +1405,7 @@ function handleChatConnection(ws, request) {
                     { ...telemetryContext, telemetryEnabled: commandTelemetryEnabled },
                 );
                 writer.telemetryContext = { ...telemetryContext, provider: 'gemini', telemetryEnabled: commandTelemetryEnabled };
+                writer.setProjectPath(data.options?.projectPath || data.options?.cwd || null);
                 await spawnGemini(data.command, { ...data.options, env: sessionEnv }, writer);
             } else if (data.type === 'cursor-resume') {
                 // Backward compatibility: treat as cursor-command with resume and no prompt

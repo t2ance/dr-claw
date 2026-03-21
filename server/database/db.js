@@ -583,6 +583,27 @@ const sessionDb = {
     }
   },
 
+  getSessionsByProjects: (projectNames = []) => {
+    try {
+      if (!Array.isArray(projectNames) || projectNames.length === 0) {
+        return [];
+      }
+
+      const placeholders = projectNames.map(() => '?').join(', ');
+      const rows = db.prepare(
+        `SELECT * FROM session_metadata WHERE project_name IN (${placeholders}) ORDER BY datetime(last_activity) DESC, datetime(created_at) DESC`
+      ).all(...projectNames);
+
+      return rows.map(row => ({
+        ...row,
+        metadata: row.metadata ? JSON.parse(row.metadata) : null
+      }));
+    } catch (err) {
+      console.error('Error getting sessions for projects:', err.message);
+      return [];
+    }
+  },
+
   // Get metadata for a specific session
   getSessionById: (id) => {
     try {
