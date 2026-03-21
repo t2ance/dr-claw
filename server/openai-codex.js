@@ -276,7 +276,7 @@ export async function queryCodex(command, options = {}, ws) {
       codex,
       status: 'running',
       abortController,
-      startedAt: new Date().toISOString()
+      startTime: Date.now()
     });
 
     // Send session created event
@@ -354,12 +354,17 @@ export async function queryCodex(command, options = {}, ws) {
           : event.type === 'item.completed' ? 'completed' : 'other';
       }
 
+      // Add startTime for frontend timer synchronization
+      const activeSession = currentSessionId ? activeCodexSessions.get(currentSessionId) : null;
+      if (activeSession?.startTime) {
+        transformed.startTime = activeSession.startTime;
+      }
+
       sendMessage(ws, {
         type: 'codex-response',
         data: transformed,
         sessionId: currentSessionId
       });
-
       // Extract and send token usage if available (normalized to match Claude format)
       if (event.type === 'turn.completed' && event.usage) {
         const totalTokens = (event.usage.input_tokens || 0) + (event.usage.output_tokens || 0);
@@ -441,6 +446,16 @@ export function isCodexSessionActive(sessionId) {
 }
 
 /**
+ * Get the start time of a Codex session
+ * @param {string} sessionId - Session ID
+ * @returns {number|null} Start time in ms or null
+ */
+export function getCodexSessionStartTime(sessionId) {
+  const session = activeCodexSessions.get(sessionId);
+  return session ? session.startTime : null;
+}
+
+/**
  * Get all active sessions
  * @returns {Array} - Array of active session info
  */
@@ -452,7 +467,7 @@ export function getActiveCodexSessions() {
       sessions.push({
         id,
         status: session.status,
-        startedAt: session.startedAt
+        startTime: session.startTime
       });
     }
   }

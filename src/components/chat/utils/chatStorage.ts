@@ -4,6 +4,7 @@ export const CLAUDE_SETTINGS_KEY = 'claude-settings';
 export const GEMINI_SETTINGS_KEY = 'gemini-settings';
 export const CURSOR_SETTINGS_KEY = 'cursor-tools-settings';
 export const CODEX_SETTINGS_KEY = 'codex-settings';
+const SESSION_TIMER_PREFIX = 'session_timer_start_';
 
 export function getProviderSettingsKey(provider?: string) {
   switch (provider) {
@@ -85,6 +86,50 @@ export const safeLocalStorage = {
     }
   },
 };
+
+export function persistSessionTimerStart(sessionId: string | null | undefined, startTime: number | null | undefined) {
+  if (!sessionId || !Number.isFinite(startTime)) {
+    return;
+  }
+
+  safeLocalStorage.setItem(`${SESSION_TIMER_PREFIX}${sessionId}`, String(startTime));
+}
+
+export function readSessionTimerStart(sessionId: string | null | undefined): number | null {
+  if (!sessionId) {
+    return null;
+  }
+
+  const raw = safeLocalStorage.getItem(`${SESSION_TIMER_PREFIX}${sessionId}`);
+  if (!raw) {
+    return null;
+  }
+
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function clearSessionTimerStart(sessionId: string | null | undefined) {
+  if (!sessionId) {
+    return;
+  }
+
+  safeLocalStorage.removeItem(`${SESSION_TIMER_PREFIX}${sessionId}`);
+}
+
+export function moveSessionTimerStart(fromSessionId: string | null | undefined, toSessionId: string | null | undefined) {
+  if (!fromSessionId || !toSessionId || fromSessionId === toSessionId) {
+    return;
+  }
+
+  const startTime = readSessionTimerStart(fromSessionId);
+  if (!startTime) {
+    return;
+  }
+
+  persistSessionTimerStart(toSessionId, startTime);
+  clearSessionTimerStart(fromSessionId);
+}
 
 export function getProviderSettings(provider?: string): ProviderSettings {
   const raw = safeLocalStorage.getItem(getProviderSettingsKey(provider));

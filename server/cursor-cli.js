@@ -81,7 +81,10 @@ async function spawnCursor(command, options = {}, ws) {
     
     // Store process reference for potential abort
     const processKey = capturedSessionId || Date.now().toString();
-    activeCursorProcesses.set(processKey, cursorProcess);
+    activeCursorProcesses.set(processKey, {
+      process: cursorProcess,
+      startTime: Date.now()
+    });
     
     // Handle stdout (streaming JSON responses)
     cursorProcess.stdout.on('data', (data) => {
@@ -106,8 +109,18 @@ async function spawnCursor(command, options = {}, ws) {
                   
                   // Update process key with captured session ID
                   if (processKey !== capturedSessionId) {
-                    activeCursorProcesses.delete(processKey);
-                    activeCursorProcesses.set(capturedSessionId, cursorProcess);
+                    const sessionData = activeCursorProcesses.get(processKey);
+                    if (sessionData) {
+                      activeCursorProcesses.delete(processKey);
+                      sessionData.sessionId = capturedSessionId;
+                      activeCursorProcesses.set(capturedSessionId, sessionData);
+                    } else {
+                      // Fallback if somehow not found
+                      activeCursorProcesses.set(capturedSessionId, {
+                        process: cursorProcess,
+                        startTime: Date.now()
+                      });
+                    }
                   }
                   
                   // Set session ID on writer (for API endpoint compatibility)
@@ -118,31 +131,37 @@ async function spawnCursor(command, options = {}, ws) {
                   // Send session-created event only once for new sessions
                   if (!sessionId && !sessionCreatedSent) {
                     sessionCreatedSent = true;
+                    const sessionData = activeCursorProcesses.get(capturedSessionId || processKey);
                     ws.send({
                       type: 'session-created',
                       sessionId: capturedSessionId,
                       model: response.model,
                       cwd: response.cwd,
-                      mode: sessionMode || 'research'
+                      mode: sessionMode || 'research',
+                      startTime: sessionData?.startTime
                     });
                   }
                 }
                 
                 // Send system info to frontend
+                const sessionData = activeCursorProcesses.get(capturedSessionId || processKey);
                 ws.send({
                   type: 'cursor-system',
                   data: response,
-                  sessionId: capturedSessionId || sessionId || null
+                  sessionId: capturedSessionId || sessionId || null,
+                  startTime: sessionData?.startTime
                 });
               }
               break;
               
             case 'user':
               // Forward user message
+              const sessionDataUser = activeCursorProcesses.get(capturedSessionId || processKey);
               ws.send({
                 type: 'cursor-user',
                 data: response,
-                sessionId: capturedSessionId || sessionId || null
+                sessionId: capturedSessionId || sessionId || null,
+                startTime: sessionDataUser?.startTime
               });
               break;
               
@@ -202,10 +221,12 @@ async function spawnCursor(command, options = {}, ws) {
         } catch (parseError) {
           console.log('📄 Non-JSON response:', line);
           // If not JSON, send as raw text
+          const sessionData = activeCursorProcesses.get(capturedSessionId || processKey);
           ws.send({
             type: 'cursor-output',
             data: line,
-            sessionId: capturedSessionId || sessionId || null
+            sessionId: capturedSessionId || sessionId || null,
+            startTime: sessionData?.startTime
           });
         }
       }
@@ -266,10 +287,10 @@ async function spawnCursor(command, options = {}, ws) {
 }
 
 function abortCursorSession(sessionId) {
-  const process = activeCursorProcesses.get(sessionId);
-  if (process) {
+  const sessionData = activeCursorProcesses.get(sessionId);
+  if (sessionData && sessionData.process) {
     console.log(`🛑 Aborting Cursor session: ${sessionId}`);
-    process.kill('SIGTERM');
+    sessionData.process.kill('SIGTERM');
     activeCursorProcesses.delete(sessionId);
     return true;
   }
@@ -280,6 +301,11 @@ function isCursorSessionActive(sessionId) {
   return activeCursorProcesses.has(sessionId);
 }
 
+function getCursorSessionStartTime(sessionId) {
+  const sessionData = activeCursorProcesses.get(sessionId);
+  return sessionData ? sessionData.startTime : null;
+}
+
 function getActiveCursorSessions() {
   return Array.from(activeCursorProcesses.keys());
 }
@@ -288,5 +314,6 @@ export {
   spawnCursor,
   abortCursorSession,
   isCursorSessionActive,
+  getCursorSessionStartTime,
   getActiveCursorSessions
 };

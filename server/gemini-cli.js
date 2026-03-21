@@ -569,29 +569,31 @@ export async function spawnGemini(command, options = {}, ws) {
     console.log(`[Gemini] Process spawned with PID: ${geminiProcess.pid}`);
     
     const initialKey = capturedSessionId || `temp-${Date.now()}`;
-    
-    const statusHeartbeat = setInterval(() => {
-      ws.send({
-        type: 'gemini-status',
-        data: { status: 'Working...', can_interrupt: true },
-        sessionId: capturedSessionId || sessionId || null
-      });
-    }, 2000);
+    const startTimeValue = Date.now();
 
     const sessionData = {
       process: geminiProcess,
-      heartbeat: statusHeartbeat,
       sessionId: capturedSessionId,
+      startTime: startTimeValue,
       options,
       sessionAllowedTools,
       sessionDisallowedTools
     };
 
+    const statusHeartbeat = setInterval(() => {
+      ws.send({
+        type: 'gemini-status',
+        data: { status: 'Working...', can_interrupt: true, startTime: sessionData.startTime },
+        sessionId: capturedSessionId || sessionId || null
+      });
+    }, 2000);
+
+    sessionData.heartbeat = statusHeartbeat;
     activeGeminiSessions.set(initialKey, sessionData);
 
     ws.send({
       type: 'gemini-status',
-      data: { status: 'Working...', can_interrupt: true },
+      data: { status: 'Working...', can_interrupt: true, startTime: startTimeValue },
       sessionId: capturedSessionId || sessionId || null
     });
 
@@ -602,7 +604,8 @@ export async function spawnGemini(command, options = {}, ws) {
           type: 'gemini-response',
           data: {
             type: 'message_start',
-            message: { id: `msg_gemini_${Date.now()}`, role: 'assistant', content: [], model: model || 'gemini' }
+            message: { id: `msg_gemini_${Date.now()}`, role: 'assistant', content: [], model: model || 'gemini' },
+            startTime: sessionData.startTime
           },
           sessionId: id || capturedSessionId || sessionId || null
         });
@@ -618,7 +621,8 @@ export async function spawnGemini(command, options = {}, ws) {
         data: {
           type: 'content_block_start',
           index: index,
-          content_block: type === 'text' ? { type: 'text', text: '' } : { type: 'tool_use', id: `tool_${Date.now()}`, name: '', input: {} }
+          content_block: type === 'text' ? { type: 'text', text: '' } : { type: 'tool_use', id: `tool_${Date.now()}`, name: '', input: {} },
+          startTime: sessionData.startTime
         },
         sessionId: id || capturedSessionId || sessionId || null
       });
@@ -1188,4 +1192,12 @@ export function abortGeminiSession(sessionId) {
 }
 
 export function isGeminiSessionActive(sessionId) { return activeGeminiSessions.has(sessionId); }
-export function getActiveGeminiSessions() { return Array.from(activeGeminiSessions.keys()); }
+
+export function getGeminiSessionStartTime(sessionId) {
+  const session = activeGeminiSessions.get(sessionId);
+  return session ? session.startTime : null;
+}
+
+export function getActiveGeminiSessions() {
+  return Array.from(activeGeminiSessions.keys());
+}

@@ -16,7 +16,7 @@ import { isTelemetryEnabled } from '../../../utils/telemetry';
 import { thinkingModes } from '../constants/thinkingModes';
 
 import { grantToolPermission } from '../utils/chatPermissions';
-import { getProviderSettingsKey, safeLocalStorage } from '../utils/chatStorage';
+import { getProviderSettingsKey, persistSessionTimerStart, safeLocalStorage } from '../utils/chatStorage';
 import { consumeWorkspaceQaDraft, WORKSPACE_QA_DRAFT_EVENT } from '../../../utils/workspaceQa';
 import type {
   ChatMessage,
@@ -60,7 +60,7 @@ interface UseChatComposerStateArgs {
   setSessionMessages?: Dispatch<SetStateAction<any[]>>;
   setIsLoading: (loading: boolean) => void;
   setCanAbortSession: (canAbort: boolean) => void;
-  setClaudeStatus: (status: { text: string; tokens: number; can_interrupt: boolean } | null) => void;
+  setClaudeStatus: Dispatch<SetStateAction<{ text: string; tokens: number; can_interrupt: boolean; startTime?: number } | null>>;
   setIsUserScrolledUp: (isScrolledUp: boolean) => void;
   setPendingPermissionRequests: Dispatch<SetStateAction<PendingPermissionRequest[]>>;
   newSessionMode?: SessionMode;
@@ -621,12 +621,14 @@ export function useChatComposerState({
         clearTimeout(abortTimeoutRef.current);
         abortTimeoutRef.current = null;
       }
+      const turnStartTime = Date.now();
       setIsLoading(true);
       setCanAbortSession(true);
       setClaudeStatus({
         text: 'Processing',
         tokens: 0,
         can_interrupt: true,
+        startTime: turnStartTime,
       });
 
       setIsUserScrolledUp(false);
@@ -662,6 +664,7 @@ export function useChatComposerState({
         }
         pendingViewSessionRef.current = { sessionId: null, startedAt: Date.now() };
       }
+      persistSessionTimerStart(sessionToActivate, turnStartTime);
       onSessionActive?.(sessionToActivate);
 
       const getToolsSettings = () => {
