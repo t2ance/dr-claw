@@ -18,6 +18,13 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+fetch('/health').then(r => r.json()).then(data => {
+  if (data.hostname) {
+    document.title = `Dr. Claw @ ${data.hostname}`;
+    window.__DR_CLAW_HOSTNAME = data.hostname;
+  }
+});
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />

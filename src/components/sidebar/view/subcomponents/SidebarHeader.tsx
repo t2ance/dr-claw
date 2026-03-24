@@ -47,7 +47,7 @@ export default function SidebarHeader({
   const LogoBlock = () => (
     <div className="flex items-center gap-2.5 min-w-0">
       <img src="/icons/file.svg" alt="Dr. Claw" className="w-7 h-7 rounded-lg shadow-sm flex-shrink-0" />
-      <h1 className="text-[15px] font-bold text-foreground tracking-tight truncate">{t('app.title')}</h1>
+      <h1 className="text-[15px] font-bold text-foreground tracking-tight truncate">{t('app.title')}{(window as any).__DR_CLAW_HOSTNAME ? ` @ ${(window as any).__DR_CLAW_HOSTNAME}` : ''}</h1>
     </div>
   );
 
