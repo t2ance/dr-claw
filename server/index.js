@@ -44,7 +44,7 @@ import pty from 'node-pty';
 import fetch from 'node-fetch';
 import mime from 'mime-types';
 
-import { getProjects, getTrashedProjects, getSessions, getSessionMessages, renameProject, renameSession, deleteSession, deleteProject, restoreProject, deleteTrashedProject, addProjectManually, extractProjectDirectory, clearProjectDirectoryCache } from './projects.js';
+import { getProjects, getTrashedProjects, getSessions, getSessionMessages, renameProject, renameSession, deleteSession, deleteProject, restoreProject, deleteTrashedProject, addProjectManually, extractProjectDirectory, clearProjectDirectoryCache, reconcileClaudeSessionIndex } from './projects.js';
 import { getProjectTokenUsageSummary } from './project-token-usage.js';
 import { queryClaudeSDK, abortClaudeSDKSession, isClaudeSDKSessionActive, getClaudeSDKSessionStartTime, getActiveClaudeSDKSessions, resolveToolApproval } from './claude-sdk.js';
 import { spawnCursor, abortCursorSession, isCursorSessionActive, getCursorSessionStartTime, getActiveCursorSessions } from './cursor-cli.js';
@@ -98,6 +98,7 @@ const connectedClients = new Set();
 let isGetProjectsRunning = false; // Flag to prevent reentrant calls
 let hasPendingProjectsUpdate = false;
 let lastWatcherEvent = null;
+let pendingClaudeSessionEvents = [];
 let lastProjectsUpdateSignature = '';
 
 function shouldProcessProjectsWatcherEvent(eventType, filePath, provider) {
@@ -163,6 +164,15 @@ async function setupProjectsWatcher() {
 
         lastWatcherEvent = { eventType, filePath, provider, rootPath };
 
+        // Accumulate Claude .jsonl events during debounce window
+        if (provider === 'claude' && (eventType === 'add' || eventType === 'change') && filePath.endsWith('.jsonl')) {
+            const sessionId = path.basename(filePath, '.jsonl');
+            if (!sessionId.startsWith('agent-')) {
+                const projectName = path.basename(path.dirname(filePath));
+                pendingClaudeSessionEvents.push({ projectName, sessionId });
+            }
+        }
+
         if (projectsWatcherDebounceTimer) {
             clearTimeout(projectsWatcherDebounceTimer);
         }
@@ -180,6 +190,12 @@ async function setupProjectsWatcher() {
 
                 // Clear project directory cache when files change
                 clearProjectDirectoryCache();
+
+                // Index CLI-created sessions accumulated during debounce window
+                const eventsToProcess = pendingClaudeSessionEvents.splice(0);
+                for (const { projectName, sessionId } of eventsToProcess) {
+                    await reconcileClaudeSessionIndex(projectName, sessionId);
+                }
 
                 // Get updated projects list
                 const updatedProjects = await getProjects();
@@ -2980,6 +2996,19 @@ async function startServer() {
             // Ensure the workspaces root directory exists
             const startupWorkspaceRoot = await getWorkspacesRoot();
             await fsPromises.mkdir(startupWorkspaceRoot, { recursive: true });
+
+            // Reconcile CLI-created sessions on startup
+            try {
+                const allProjects = await getProjects();
+                for (const project of allProjects) {
+                    if (project.name) {
+                        await reconcileClaudeSessionIndex(project.name);
+                    }
+                }
+                console.log(`${c.ok('[OK]')}   Reconciled session index for ${allProjects.length} projects`);
+            } catch (err) {
+                console.error('[WARN] Failed to reconcile sessions on startup:', err.message);
+            }
 
             // Start watching the projects folder for changes
             await setupProjectsWatcher();
