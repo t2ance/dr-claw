@@ -24,6 +24,10 @@ interface MentionableFile {
   path: string;
 }
 
+function getFileKey(file: File) {
+  return `${file.name}:${file.size}:${file.lastModified}`;
+}
+
 interface SlashCommand {
   name: string;
   description?: string;
@@ -60,7 +64,7 @@ interface ChatComposerProps {
   onSubmit: (event: FormEvent<HTMLFormElement> | MouseEvent<HTMLButtonElement> | TouchEvent<HTMLButtonElement>) => void;
   isDragActive: boolean;
   attachedFiles: File[];
-  onRemoveImage: (index: number) => void;
+  onRemoveFile: (index: number) => void;
   uploadingFiles: Map<string, number>;
   fileErrors: Map<string, string>;
   showFileDropdown: boolean;
@@ -117,7 +121,7 @@ export default function ChatComposer({
   onSubmit,
   isDragActive,
   attachedFiles,
-  onRemoveImage,
+  onRemoveFile,
   uploadingFiles,
   fileErrors,
   showFileDropdown,
@@ -228,9 +232,9 @@ export default function ChatComposer({
                 <ImageAttachment
                   key={index}
                   file={file}
-                  onRemove={() => onRemoveImage(index)}
-                  uploadProgress={uploadingFiles.get(file.name)}
-                  error={fileErrors.get(file.name)}
+                  onRemove={() => onRemoveFile(index)}
+                  uploadProgress={uploadingFiles.get(getFileKey(file))}
+                  error={fileErrors.get(getFileKey(file))}
                 />
               ))}
             </div>
@@ -239,9 +243,9 @@ export default function ChatComposer({
 
         {fileErrors.size > 0 && (
           <div className="mb-2 rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2 text-sm text-red-600">
-            {[...fileErrors.entries()].map(([name, error]) => (
-              <div key={`${name}-${error}`} className="truncate">
-                {name}: {error}
+            {[...new Set(fileErrors.values())].map((error) => (
+              <div key={error} className="truncate">
+                {error}
               </div>
             ))}
           </div>

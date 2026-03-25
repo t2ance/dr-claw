@@ -17,30 +17,15 @@ import { isTelemetryEnabled } from '../../../utils/telemetry';
 import { thinkingModes } from '../constants/thinkingModes';
 
 import { grantToolPermission } from '../utils/chatPermissions';
-import { getProviderSettingsKey, safeLocalStorage } from '../utils/chatStorage';
+import { getProviderSettingsKey, persistSessionTimerStart, safeLocalStorage } from '../utils/chatStorage';
 import { consumeWorkspaceQaDraft, WORKSPACE_QA_DRAFT_EVENT } from '../../../utils/workspaceQa';
 import type {
+  ChatAttachment,
+  ChatImage,
   ChatMessage,
   PendingPermissionRequest,
   PermissionMode,
 } from '../types/types';
-
-const CHAT_ATTACHMENT_MAX_SIZE = 50 * 1024 * 1024;
-const MAX_CHAT_ATTACHMENTS = 5;
-function formatRejectedFileMessage(rejection: FileRejection) {
-  const name = rejection.file?.name || 'Unknown file';
-  const messages = rejection.errors.map((error) => {
-    if (error.code === 'file-too-large') {
-      return 'File too large (max 50MB)';
-    }
-    if (error.code === 'too-many-files') {
-      return 'Too many files (max 5)';
-    }
-    return error.message;
-  });
-
-  return { name, message: messages.join(', ') || 'File rejected' };
-}
 import { useFileMentions } from './useFileMentions';
 import { type SlashCommand, useSlashCommands } from './useSlashCommands';
 import type { Project, ProjectSession, SessionProvider } from '../../../types/app';
@@ -78,7 +63,7 @@ interface UseChatComposerStateArgs {
   setSessionMessages?: Dispatch<SetStateAction<any[]>>;
   setIsLoading: (loading: boolean) => void;
   setCanAbortSession: (canAbort: boolean) => void;
-  setClaudeStatus: (status: { text: string; tokens: number; can_interrupt: boolean } | null) => void;
+  setClaudeStatus: Dispatch<SetStateAction<{ text: string; tokens: number; can_interrupt: boolean; startTime?: number } | null>>;
   setIsUserScrolledUp: (isScrolledUp: boolean) => void;
   setPendingPermissionRequests: Dispatch<SetStateAction<PendingPermissionRequest[]>>;
   newSessionMode?: SessionMode;
@@ -98,15 +83,102 @@ interface CommandExecutionResult {
   hasFileIncludes?: boolean;
 }
 
+interface UploadedProjectFile {
+  name?: string;
+  path?: string;
+  size?: number;
+}
+
 const createFakeSubmitEvent = () => {
   return { preventDefault: () => undefined } as unknown as FormEvent<HTMLFormElement>;
 };
 
 const PROGRAMMATIC_SUBMIT_MAX_RETRIES = 12;
 const PROGRAMMATIC_SUBMIT_RETRY_DELAY_MS = 50;
+const MAX_ATTACHMENTS = 5;
+const MAX_ATTACHMENT_SIZE_BYTES = 50 * 1024 * 1024;
+const CODEX_ATTACHMENT_DIR = '.dr-claw/chat-attachments';
+
+const IMAGE_EXTENSIONS = new Set([
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.bmp',
+  '.svg',
+  '.heic',
+  '.heif',
+]);
+
+const PDF_EXTENSION = '.pdf';
+
+function getAttachmentKey(file: File) {
+  return `${file.name}:${file.size}:${file.lastModified}`;
+}
+
+function getFileExtension(file: File) {
+  const lowerName = file.name.toLowerCase();
+  const lastDot = lowerName.lastIndexOf('.');
+  return lastDot >= 0 ? lowerName.slice(lastDot) : '';
+}
+
+function isImageAttachment(file: File) {
+  return file.type.startsWith('image/') || IMAGE_EXTENSIONS.has(getFileExtension(file));
+}
+
+function isPdfAttachment(file: File) {
+  return file.type === 'application/pdf' || getFileExtension(file) === PDF_EXTENSION;
+}
+
+function getAttachmentKind(file: File) {
+  if (isImageAttachment(file)) {
+    return 'image';
+  }
+  if (isPdfAttachment(file)) {
+    return 'pdf';
+  }
+  return 'file';
+}
+
+function formatRejectedFileMessage(rejection: FileRejection) {
+  const attachmentKey = getAttachmentKey(rejection.file);
+  const name = rejection.file?.name || 'Unknown file';
+  const messages = rejection.errors.map((error) => {
+    if (error.code === 'file-too-large') {
+      return 'File too large (max 50MB)';
+    }
+    if (error.code === 'too-many-files') {
+      return 'Too many files (max 5)';
+    }
+    return error.message;
+  });
+
+  return {
+    attachmentKey,
+    message: `${name}: ${messages.join(', ') || 'File rejected'}`,
+  };
+}
 
 const isTemporarySessionId = (sessionId: string | null | undefined) =>
   Boolean(sessionId && sessionId.startsWith('new-session-'));
+
+const getRouteSessionId = () => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const match = window.location.pathname.match(/^\/session\/([^/]+)$/);
+  if (!match?.[1]) {
+    return null;
+  }
+
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
+};
 
 export function useChatComposerState({
   selectedProject,
@@ -460,32 +532,61 @@ export function useChatComposerState({
     inputHighlightRef.current.scrollLeft = target.scrollLeft;
   }, []);
 
-  const handleAttachedFiles = useCallback((files: File[]) => {
-    const validFiles = files.filter((file) => {
+  const handleAttachmentFiles = useCallback((files: File[]) => {
+    const validFiles: File[] = [];
+
+    files.forEach((file) => {
       try {
         if (!file || typeof file !== 'object') {
           console.warn('Invalid file object:', file);
-          return false;
+          return;
         }
+
+        const attachmentKey = getAttachmentKey(file);
 
         if (!file.size) {
-          return false;
+          setFileErrors((previous) => {
+            const next = new Map(previous);
+            next.set(attachmentKey, `${file.name || 'Unknown file'}: Empty files are not supported`);
+            return next;
+          });
+          return;
         }
 
-        return true;
+        if (file.size > MAX_ATTACHMENT_SIZE_BYTES) {
+          setFileErrors((previous) => {
+            const next = new Map(previous);
+            next.set(attachmentKey, `${file.name || 'Unknown file'}: File too large (max 50MB)`);
+            return next;
+          });
+          return;
+        }
+
+        validFiles.push(file);
       } catch (error) {
         console.error('Error validating file:', error, file);
-        return false;
       }
     });
 
     if (validFiles.length > 0) {
       setFileErrors((previous) => {
         const next = new Map(previous);
-        validFiles.forEach((file) => next.delete(file.name || 'Unknown file'));
+        validFiles.forEach((file) => {
+          next.delete(getAttachmentKey(file));
+        });
         return next;
       });
-      setAttachedFiles((previous) => [...previous, ...validFiles].slice(0, MAX_CHAT_ATTACHMENTS));
+
+      setAttachedFiles((previous) => {
+        const deduped = [...previous];
+        validFiles.forEach((file) => {
+          const nextKey = getAttachmentKey(file);
+          if (!deduped.some((existing) => getAttachmentKey(existing) === nextKey)) {
+            deduped.push(file);
+          }
+        });
+        return deduped.slice(0, MAX_ATTACHMENTS);
+      });
     }
   }, []);
 
@@ -497,9 +598,32 @@ export function useChatComposerState({
     setFileErrors((previous) => {
       const next = new Map(previous);
       rejections.forEach((rejection) => {
-        const { name, message } = formatRejectedFileMessage(rejection);
-        next.set(name, message);
+        const { attachmentKey, message } = formatRejectedFileMessage(rejection);
+        next.set(attachmentKey, message);
       });
+      return next;
+    });
+  }, []);
+
+  const removeAttachedFile = useCallback((index: number) => {
+    setAttachedFiles((previous) => {
+      const next = [...previous];
+      const [removedFile] = next.splice(index, 1);
+
+      if (removedFile) {
+        const attachmentKey = getAttachmentKey(removedFile);
+        setFileErrors((previousErrors) => {
+          const nextErrors = new Map(previousErrors);
+          nextErrors.delete(attachmentKey);
+          return nextErrors;
+        });
+        setUploadingFiles((previousUploads) => {
+          const nextUploads = new Map(previousUploads);
+          nextUploads.delete(attachmentKey);
+          return nextUploads;
+        });
+      }
+
       return next;
     });
   }, []);
@@ -514,28 +638,84 @@ export function useChatComposerState({
         }
         const file = item.getAsFile();
         if (file) {
-          handleAttachedFiles([file]);
+          handleAttachmentFiles([file]);
         }
       });
 
       if (items.length === 0 && event.clipboardData.files.length > 0) {
         const files = Array.from(event.clipboardData.files);
         if (files.length > 0) {
-          handleAttachedFiles(files);
+          handleAttachmentFiles(files);
         }
       }
     },
-    [handleAttachedFiles],
+    [handleAttachmentFiles],
   );
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
-    maxSize: CHAT_ATTACHMENT_MAX_SIZE,
-    maxFiles: MAX_CHAT_ATTACHMENTS,
-    onDrop: handleAttachedFiles,
+    maxSize: MAX_ATTACHMENT_SIZE_BYTES,
+    maxFiles: MAX_ATTACHMENTS,
+    onDrop: handleAttachmentFiles,
     onDropRejected: handleRejectedFiles,
     noClick: true,
     noKeyboard: true,
   });
+
+  const uploadPreviewImages = useCallback(
+    async (files: File[]) => {
+      if (files.length === 0) {
+        return [];
+      }
+
+      const formData = new FormData();
+      files.forEach((file) => {
+        formData.append('images', file);
+      });
+
+      const response = await authenticatedFetch(`/api/projects/${encodeURIComponent(selectedProject?.name || '')}/upload-images`, {
+        method: 'POST',
+        headers: {},
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to upload images');
+      }
+
+      const result = await response.json();
+      return Array.isArray(result.images) ? (result.images as ChatImage[]) : [];
+    },
+    [selectedProject?.name],
+  );
+
+  const uploadFilesToProject = useCallback(
+    async (files: File[]) => {
+      if (!selectedProject || files.length === 0) {
+        return [];
+      }
+
+      const formData = new FormData();
+      const targetDir = `${CODEX_ATTACHMENT_DIR}/${Date.now()}`;
+      formData.append('targetDir', targetDir);
+      files.forEach((file) => {
+        formData.append('files', file);
+      });
+
+      const response = await authenticatedFetch(`/api/projects/${encodeURIComponent(selectedProject.name)}/upload-files`, {
+        method: 'POST',
+        headers: {},
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to upload files');
+      }
+
+      const result = await response.json();
+      return Array.isArray(result.files) ? (result.files as UploadedProjectFile[]) : [];
+    },
+    [selectedProject],
+  );
 
   const handleSubmit = useCallback(
     async (
@@ -590,34 +770,20 @@ export function useChatComposerState({
         setIntakeGreeting(null);
       }
 
-      let uploadedFiles: Array<{ name: string; size: number; path: string; mimeType?: string; data?: string }> = [];
+      let uploadedImages: ChatImage[] = [];
+      let codexAttachmentPayload:
+        | {
+            imagePaths: string[];
+            documentPaths: string[];
+          }
+        | undefined;
+      let messageAttachments: ChatAttachment[] = [];
+
       if (attachedFiles.length > 0) {
-        const formData = new FormData();
-        const attachmentTargetDir = `.attachments/chat/${Date.now()}`;
-        formData.append('targetDir', attachmentTargetDir);
-        attachedFiles.forEach((file) => {
-          formData.append('files', file);
-        });
+        let uploadedFiles: UploadedProjectFile[] = [];
 
         try {
-          const response = await authenticatedFetch(`/api/projects/${selectedProject.name}/upload-files`, {
-            method: 'POST',
-            headers: {},
-            body: formData,
-          });
-
-          if (!response.ok) {
-            throw new Error('Failed to upload files');
-          }
-
-          const result = await response.json();
-          uploadedFiles = Array.isArray(result.files)
-            ? result.files.map((file: { name: string; size: number; path: string }, index: number) => ({
-              ...file,
-              mimeType: attachedFiles[index]?.type || '',
-              data: file.path,
-            }))
-            : [];
+          uploadedFiles = await uploadFilesToProject(attachedFiles);
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Unknown error';
           console.error('File upload failed:', error);
@@ -632,18 +798,73 @@ export function useChatComposerState({
           return;
         }
 
+        messageAttachments = attachedFiles.map((file, index) => {
+          const uploadedFile = uploadedFiles[index];
+          const uploadedPath = uploadedFile?.path && typeof uploadedFile.path === 'string' ? uploadedFile.path : undefined;
+
+          return {
+            name: file.name,
+            kind: getAttachmentKind(file),
+            mimeType: file.type || undefined,
+            path: uploadedPath,
+          };
+        });
+
         if (uploadedFiles.length > 0) {
           const fileNote = `\n\n[Files available at the following paths]\n${uploadedFiles
             .map((file, index) => `${index + 1}. ${file.path}`)
             .join('\n')}`;
           messageContent = `${messageContent}${fileNote}`;
         }
+
+        if (provider === 'codex') {
+          codexAttachmentPayload = uploadedFiles.reduce(
+            (
+              accumulator: {
+                imagePaths: string[];
+                documentPaths: string[];
+              },
+              uploadedFile: UploadedProjectFile,
+              index: number,
+            ) => {
+              const sourceFile = attachedFiles[index];
+              const uploadedPath =
+                uploadedFile?.path && typeof uploadedFile.path === 'string' ? uploadedFile.path : null;
+
+              if (!sourceFile || !uploadedPath) {
+                return accumulator;
+              }
+
+              if (isImageAttachment(sourceFile)) {
+                accumulator.imagePaths.push(uploadedPath);
+              } else if (isPdfAttachment(sourceFile)) {
+                accumulator.documentPaths.push(uploadedPath);
+              }
+
+              return accumulator;
+            },
+            {
+              imagePaths: [] as string[],
+              documentPaths: [] as string[],
+            },
+          );
+        }
+
+        const imageFiles = attachedFiles.filter((file) => isImageAttachment(file));
+        if (imageFiles.length > 0) {
+          try {
+            uploadedImages = await uploadPreviewImages(imageFiles);
+          } catch (error) {
+            console.error('Image preview upload failed:', error);
+          }
+        }
       }
 
       const userMessage: ChatMessage = {
         type: 'user',
-        content: currentInput,
-        images: uploadedFiles as any,
+        content: normalizedInput,
+        images: uploadedImages.length > 0 ? uploadedImages : undefined,
+        attachments: messageAttachments.length > 0 ? messageAttachments : undefined,
         timestamp: new Date(),
       };
 
@@ -652,37 +873,56 @@ export function useChatComposerState({
         clearTimeout(abortTimeoutRef.current);
         abortTimeoutRef.current = null;
       }
+      const turnStartTime = Date.now();
       setIsLoading(true);
       setCanAbortSession(true);
       setClaudeStatus({
         text: 'Processing',
         tokens: 0,
         can_interrupt: true,
+        startTime: turnStartTime,
       });
 
       setIsUserScrolledUp(false);
       setTimeout(() => scrollToBottom(), 100);
 
-      // Determine the session ID to use.
-      // If we're on the home route ('/') and currentSessionId is null, we are starting a new session.
-      const isExplicitNewSession = !currentSessionId && window.location.pathname === '/';
-      const isNewSession = isExplicitNewSession || (!currentSessionId && !selectedSession?.id);
+      // Reuse the session currently represented by the route or pending view state.
+      // This prevents interrupted chats from being treated as brand new sessions.
+      const routedSessionId = getRouteSessionId();
       
-      const effectiveSessionId = isExplicitNewSession 
-        ? null 
-        : (currentSessionId || selectedSession?.id || (provider === 'gemini' ? sessionStorage.getItem('geminiSessionId') : sessionStorage.getItem('cursorSessionId')));
+      // If we're on the root path with no routed session AND no selected session, 
+      // treat it as an explicit new session start and clear any stale provider-specific session IDs.
+      const isExplicitNewSessionStart = window.location.pathname === '/' && !routedSessionId && !selectedSession?.id;
+      if (isExplicitNewSessionStart && typeof window !== 'undefined') {
+        sessionStorage.removeItem('geminiSessionId');
+        sessionStorage.removeItem('cursorSessionId');
+        sessionStorage.removeItem('pendingSessionId');
+      }
+
+      const providerSessionId =
+        provider === 'gemini'
+          ? sessionStorage.getItem('geminiSessionId')
+          : provider === 'cursor'
+          ? sessionStorage.getItem('cursorSessionId')
+          : null;
+      const pendingViewSessionId = pendingViewSessionRef.current?.sessionId || null;
+      const effectiveSessionId =
+        currentSessionId ||
+        selectedSession?.id ||
+        routedSessionId ||
+        pendingViewSessionId ||
+        providerSessionId;
+      const isNewSession = !effectiveSessionId;
       const sessionToActivate = effectiveSessionId || `new-session-${Date.now()}`;
 
       if (!effectiveSessionId && !selectedSession?.id) {
         if (typeof window !== 'undefined') {
           // Reset stale pending IDs from previous interrupted runs before creating a new one.
           sessionStorage.removeItem('pendingSessionId');
-          if (provider === 'gemini') {
-            sessionStorage.removeItem('geminiSessionId');
-          }
         }
         pendingViewSessionRef.current = { sessionId: null, startedAt: Date.now() };
       }
+      persistSessionTimerStart(sessionToActivate, turnStartTime);
       onSessionActive?.(sessionToActivate);
 
       const getToolsSettings = () => {
@@ -748,6 +988,7 @@ export function useChatComposerState({
             resume: Boolean(effectiveSessionId),
             model: geminiModel,
             permissionMode,
+            images: uploadedImages.length > 0 ? uploadedImages : undefined,
             toolsSettings,
             telemetryEnabled,
             sessionMode: isNewSession ? newSessionMode : selectedSession?.mode,
@@ -766,6 +1007,7 @@ export function useChatComposerState({
             resume: Boolean(effectiveSessionId),
             model: codexModel,
             permissionMode: permissionMode === 'plan' ? 'default' : permissionMode,
+            attachments: codexAttachmentPayload,
             telemetryEnabled,
             sessionMode: isNewSession ? newSessionMode : selectedSession?.mode,
           },
@@ -783,6 +1025,7 @@ export function useChatComposerState({
             toolsSettings,
             permissionMode,
             model: claudeModel,
+            images: uploadedImages.length > 0 ? uploadedImages : undefined,
             telemetryEnabled,
             sessionMode: isNewSession ? newSessionMode : selectedSession?.mode,
           },
@@ -830,6 +1073,8 @@ export function useChatComposerState({
       slashCommands,
       thinkingMode,
       intakeGreeting,
+      uploadFilesToProject,
+      uploadPreviewImages,
     ],
   );
 
@@ -1195,7 +1440,7 @@ export function useChatComposerState({
     renderInputWithMentions,
     selectFile,
     attachedFiles,
-    setAttachedFiles,
+    removeAttachedFile,
     uploadingFiles,
     fileErrors,
     getRootProps,
