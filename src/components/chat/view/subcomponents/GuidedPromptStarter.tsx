@@ -91,13 +91,13 @@ export default function GuidedPromptStarter({
   }, []);
 
   const injectTemplate = (scenario: GuidedPromptScenario, skills: string[]) => {
-    const nextValue = buildTemplate(t, scenario, skills);
-    setInput(nextValue);
+    const template = buildTemplate(t, scenario, skills);
+    setInput(prev => prev ? `${template}\n\n${prev}` : template);
     setTimeout(() => {
       const el = textareaRef.current;
       if (!el) return;
       el.focus();
-      const cursor = nextValue.length;
+      const cursor = el.value.length;
       el.setSelectionRange(cursor, cursor);
     }, 100);
   };
