@@ -163,6 +163,8 @@ function ChatInterface({
     showLoadAllOverlay,
     claudeStatus,
     setClaudeStatus,
+    statusTextOverride,
+    setStatusTextOverride,
     createDiff,
     scrollContainerRef,
     scrollToBottom,
@@ -274,6 +276,7 @@ function ChatInterface({
     setIsLoading,
     setCanAbortSession,
     setClaudeStatus,
+    setStatusTextOverride,
     setTokenBudget,
     setIsSystemSessionChange,
     setPendingPermissionRequests,
@@ -758,6 +761,7 @@ function ChatInterface({
           showThinking={showThinking}
           selectedProject={selectedProject}
           isLoading={isLoading}
+          statusText={statusTextOverride || claudeStatus?.text}
           providerAvailability={providerAvailability}
           newSessionMode={newSessionMode}
           onNewSessionModeChange={onNewSessionModeChange}
@@ -782,7 +786,7 @@ function ChatInterface({
           pendingPermissionRequests={pendingPermissionRequests}
           handlePermissionDecision={handlePermissionDecision}
           handleGrantToolPermission={handleGrantToolPermission}
-          claudeStatus={claudeStatus}
+          claudeStatus={claudeStatus ? { ...claudeStatus, text: statusTextOverride || claudeStatus.text } : claudeStatus}
           isLoading={isLoading}
           onAbortSession={handleAbortSession}
           provider={provider}
