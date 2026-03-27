@@ -9,7 +9,67 @@ import { resolveAvailableCliCommand } from '../utils/cliResolution.js';
 
 const router = express.Router();
 
+const PROVIDER_INSTALLERS = {
+  claude: {
+    displayName: 'Claude Code CLI',
+    docsUrl: 'https://docs.anthropic.com/en/docs/claude-code/overview',
+    fallbackDownloadUrl: 'https://docs.anthropic.com/en/docs/claude-code/overview',
+    commands: {
+      darwin: [
+        { bin: 'brew', args: ['install', 'claude-code'], label: 'brew install claude-code' },
+      ],
+      win32: [
+        { bin: 'winget', args: ['install', '--id', 'Anthropic.ClaudeCode', '-e'], label: 'winget install Anthropic.ClaudeCode' },
+      ],
+    },
+  },
+  cursor: {
+    displayName: 'Cursor CLI',
+    docsUrl: 'https://cursor.com/downloads',
+    fallbackDownloadUrl: 'https://cursor.com/downloads',
+    commands: {
+      darwin: [
+        { bin: 'brew', args: ['install', '--cask', 'cursor'], label: 'brew install --cask cursor' },
+      ],
+      win32: [
+        { bin: 'winget', args: ['install', '--id', 'CursorAI,Inc.Cursor', '-e'], label: 'winget install CursorAI,Inc.Cursor' },
+      ],
+    },
+  },
+  codex: {
+    displayName: 'OpenAI Codex CLI',
+    docsUrl: 'https://github.com/openai/codex',
+    fallbackDownloadUrl: 'https://github.com/openai/codex',
+    commands: {
+      darwin: [
+        { bin: 'npm', args: ['install', '-g', '@openai/codex'], label: 'npm install -g @openai/codex' },
+      ],
+      win32: [
+        { bin: 'npm.cmd', args: ['install', '-g', '@openai/codex'], label: 'npm install -g @openai/codex' },
+      ],
+    },
+  },
+  gemini: {
+    displayName: 'Gemini CLI',
+    docsUrl: 'https://github.com/google-gemini/gemini-cli',
+    fallbackDownloadUrl: 'https://github.com/google-gemini/gemini-cli',
+    commands: {
+      darwin: [
+        { bin: 'npm', args: ['install', '-g', '@google/gemini-cli'], label: 'npm install -g @google/gemini-cli' },
+      ],
+      win32: [
+        { bin: 'npm.cmd', args: ['install', '-g', '@google/gemini-cli'], label: 'npm install -g @google/gemini-cli' },
+      ],
+    },
+  },
+};
+
 function buildCliInstallHint(agent) {
+  const installer = PROVIDER_INSTALLERS[agent];
+  if (installer?.docsUrl) {
+    return `${installer.displayName} is not installed. Install it in Dr. Claw or open the official guide: ${installer.docsUrl}`;
+  }
+
   switch (agent) {
     case 'claude':
       return 'Claude Code CLI is not installed. Install it first, then retry login.';
@@ -26,6 +86,84 @@ function buildCliInstallHint(agent) {
   }
 }
 
+function getInstallerDefinition(agent) {
+  return PROVIDER_INSTALLERS[agent] || null;
+}
+
+function getPlatformInstallCommands(agent, platform = process.platform) {
+  const definition = getInstallerDefinition(agent);
+  if (!definition) {
+    return [];
+  }
+
+  return definition.commands?.[platform] || [];
+}
+
+function runInstallCommand(command, { cwd = process.cwd(), timeoutMs = 15 * 60 * 1000 } = {}) {
+  return new Promise((resolve) => {
+    let completed = false;
+    const child = spawn(command.bin, command.args, {
+      cwd,
+      env: process.env,
+      shell: process.platform === 'win32',
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    const finish = (result) => {
+      if (completed) {
+        return;
+      }
+      completed = true;
+      resolve(result);
+    };
+
+    const timeout = setTimeout(() => {
+      if (!completed) {
+        child.kill('SIGTERM');
+      }
+      finish({
+        ok: false,
+        code: null,
+        signal: 'SIGTERM',
+        stdout,
+        stderr: `${stderr}${stderr ? '\n' : ''}Installation timed out after ${timeoutMs}ms.`,
+      });
+    }, timeoutMs);
+
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString();
+    });
+
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    child.on('error', (error) => {
+      clearTimeout(timeout);
+      finish({
+        ok: false,
+        code: null,
+        signal: null,
+        stdout,
+        stderr: `${stderr}${stderr ? '\n' : ''}${error.message}`,
+      });
+    });
+
+    child.on('close', (code, signal) => {
+      clearTimeout(timeout);
+      finish({
+        ok: code === 0,
+        code,
+        signal,
+        stdout,
+        stderr,
+      });
+    });
+  });
+}
+
 function isCliMockedMissing(agent) {
   const raw = process.env.MOCK_MISSING_CLIS || '';
   return raw
@@ -36,15 +174,107 @@ function isCliMockedMissing(agent) {
 }
 
 function buildStatusPayload(result, agent) {
+  const installCommands = getPlatformInstallCommands(agent).map((command) => ({
+    label: command.label,
+    bin: command.bin,
+    args: command.args,
+  }));
+  const definition = getInstallerDefinition(agent);
+
   return {
     authenticated: Boolean(result.authenticated),
     email: result.email || null,
     error: result.error || null,
     cliAvailable: result.cliAvailable !== false,
     cliCommand: result.cliCommand || null,
-    installHint: result.installHint || (result.cliAvailable === false ? buildCliInstallHint(agent) : null)
+    installHint: result.installHint || (result.cliAvailable === false ? buildCliInstallHint(agent) : null),
+    installable: installCommands.length > 0,
+    installCommands,
+    docsUrl: definition?.docsUrl || null,
+    downloadUrl: definition?.fallbackDownloadUrl || null,
   };
 }
+
+router.get('/providers', async (_req, res) => {
+  try {
+    const statuses = await Promise.all([
+      checkClaudeCredentials().then((result) => ['claude', buildStatusPayload(result, 'claude')]),
+      checkCursorStatus().then((result) => ['cursor', buildStatusPayload(result, 'cursor')]),
+      checkCodexCredentials().then((result) => ['codex', buildStatusPayload(result, 'codex')]),
+      checkGeminiCredentials().then((result) => ['gemini', buildStatusPayload(result, 'gemini')]),
+    ]);
+
+    res.json({ providers: Object.fromEntries(statuses) });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/install/:provider', async (req, res) => {
+  const provider = String(req.params.provider || '').toLowerCase();
+  const definition = getInstallerDefinition(provider);
+
+  if (!definition) {
+    return res.status(404).json({ error: `Unknown provider: ${provider}` });
+  }
+
+  const commands = getPlatformInstallCommands(provider);
+  if (commands.length === 0) {
+    return res.status(400).json({
+      ok: false,
+      provider,
+      error: `No automatic installer is configured for ${definition.displayName} on ${process.platform}`,
+      docsUrl: definition.docsUrl,
+      downloadUrl: definition.fallbackDownloadUrl,
+    });
+  }
+
+  const command = commands[0];
+  const result = await runInstallCommand(command);
+
+  const checker = provider === 'claude'
+    ? checkClaudeCredentials
+    : provider === 'cursor'
+      ? checkCursorStatus
+      : provider === 'codex'
+        ? checkCodexCredentials
+        : checkGeminiCredentials;
+
+  const latestStatus = await checker();
+
+  res.status(result.ok ? 200 : 500).json({
+    ok: result.ok,
+    provider,
+    command: {
+      label: command.label,
+      bin: command.bin,
+      args: command.args,
+    },
+    stdout: result.stdout,
+    stderr: result.stderr,
+    code: result.code,
+    signal: result.signal,
+    status: buildStatusPayload(latestStatus, provider),
+    docsUrl: definition.docsUrl,
+    downloadUrl: definition.fallbackDownloadUrl,
+  });
+});
+
+router.get('/download/:provider', async (req, res) => {
+  const provider = String(req.params.provider || '').toLowerCase();
+  const definition = getInstallerDefinition(provider);
+
+  if (!definition) {
+    return res.status(404).json({ error: `Unknown provider: ${provider}` });
+  }
+
+  res.json({
+    provider,
+    displayName: definition.displayName,
+    docsUrl: definition.docsUrl,
+    downloadUrl: definition.fallbackDownloadUrl,
+  });
+});
 
 router.get('/claude/status', async (req, res) => {
   try {
@@ -177,7 +407,6 @@ async function checkGeminiCredentials() {
       };
     }
 
-    // Check for GOOGLE_API_KEY environment variable first
     if (process.env.GOOGLE_API_KEY) {
       console.log('[DEBUG] Gemini: Found GOOGLE_API_KEY in environment');
       return {
@@ -188,18 +417,15 @@ async function checkGeminiCredentials() {
       };
     }
 
-    // Check for OAuth credentials file (new Gemini CLI)
     const oauthPath = path.join(os.homedir(), '.gemini', 'oauth_creds.json');
     console.log(`[DEBUG] Gemini: Checking for OAuth file at ${oauthPath}`);
     try {
       const content = await fs.readFile(oauthPath, 'utf8');
       const creds = JSON.parse(content);
 
-      // Check for presence of refresh_token or access_token
       if (creds.refresh_token || creds.access_token) {
         let email = creds.email || 'OAuth (Config)';
 
-        // Try to extract email from id_token if available
         if (!creds.email && creds.id_token) {
           try {
             const parts = creds.id_token.split('.');
@@ -230,7 +456,6 @@ async function checkGeminiCredentials() {
       }
     }
 
-    // Fallback to legacy config file check
     const configPath = path.join(os.homedir(), '.gemini', 'config.json');
     console.log(`[DEBUG] Gemini: Checking for legacy config at ${configPath}`);
     try {
@@ -301,7 +526,6 @@ async function checkClaudeCredentials() {
         if (childProcess) {
           childProcess.kill();
         }
-        // Fall back to credentials file check on timeout
         checkClaudeCredentialsFile({ cliAvailable: true, cliCommand: resolvedCliCommand }).then(resolve);
       }
     }, 5000);
@@ -319,14 +543,9 @@ async function checkClaudeCredentials() {
     }
 
     let stdout = '';
-    let stderr = '';
 
     childProcess.stdout.on('data', (data) => {
       stdout += data.toString();
-    });
-
-    childProcess.stderr.on('data', (data) => {
-      stderr += data.toString();
     });
 
     childProcess.on('close', (code) => {
@@ -347,11 +566,9 @@ async function checkClaudeCredentials() {
             return;
           }
         } catch {
-          // JSON parse failed, fall through
         }
       }
 
-      // CLI check failed, fall back to credentials file
       checkClaudeCredentialsFile({ cliAvailable: true, cliCommand: resolvedCliCommand }).then(resolve);
     });
 
@@ -359,8 +576,6 @@ async function checkClaudeCredentials() {
       if (processCompleted) return;
       processCompleted = true;
       clearTimeout(timeout);
-      // Command was already validated by resolveAvailableCliCommand, so treat
-      // any spawn error as a transient failure rather than "CLI missing".
       checkClaudeCredentialsFile({ cliAvailable: true, cliCommand: resolvedCliCommand }).then(resolve);
     });
   });
@@ -394,7 +609,7 @@ async function checkClaudeCredentialsFile({ cliAvailable = true, cliCommand = 'c
       error: cliAvailable ? null : 'Claude Code CLI not installed',
       installHint: cliAvailable ? null : buildCliInstallHint('claude')
     };
-  } catch (error) {
+  } catch (_error) {
     return {
       authenticated: false,
       email: null,
@@ -495,7 +710,7 @@ function checkCursorStatus() {
       }
     });
 
-    childProcess.on('error', (err) => {
+    childProcess.on('error', () => {
       if (processCompleted) return;
       processCompleted = true;
       clearTimeout(timeout);
@@ -575,21 +790,16 @@ async function checkCodexCredentials() {
     // Tokens are nested under 'tokens' key
     const tokens = auth?.tokens || {};
 
-    // Check for valid tokens (id_token or access_token)
     if (tokens.id_token || tokens.access_token) {
-      // Try to extract email from id_token JWT payload
       let email = 'Authenticated';
       if (tokens.id_token) {
         try {
-          // JWT is base64url encoded: header.payload.signature
           const parts = tokens.id_token.split('.');
           if (parts.length >= 2) {
-            // Decode the payload (second part)
             const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
             email = payload.email || payload.user || 'Authenticated';
           }
         } catch {
-          // If JWT decoding fails, use fallback
           email = 'Authenticated';
         }
       }
@@ -801,14 +1011,20 @@ router.post('/claude/verify-custom-api', async (req, res) => {
       })
     });
 
-    // 200 = success, 401/403 = bad token, anything else with a valid JSON body means the endpoint is reachable
     if (response.ok || (response.status >= 400 && response.status < 500 && response.status !== 401 && response.status !== 403)) {
       const envPath = path.join(process.cwd(), '.env');
       let envContent = '';
       try {
         envContent = await fs.readFile(envPath, 'utf8');
-      } catch (e) { /* ignore if not exists */ }
+      } catch (e) {}
 
+      const lines = envContent ? envContent.split(/\r?\n/) : [];
+      const nextLines = lines.filter((line) => !line.startsWith('ANTHROPIC_BASE_URL=') && !line.startsWith('ANTHROPIC_AUTH_TOKEN='));
+      nextLines.push(`ANTHROPIC_BASE_URL=${baseUrl || 'https://api.anthropic.com'}`);
+      nextLines.push(`ANTHROPIC_AUTH_TOKEN=${token}`);
+      await fs.writeFile(envPath, `${nextLines.filter(Boolean).join('\n')}\n`, 'utf8');
+
+      return res.json({ success: true });
       const keysToUpdate = {
         'ANTHROPIC_BASE_URL': baseUrl || 'https://api.anthropic.com',
         'ANTHROPIC_API_KEY': token,
@@ -851,8 +1067,10 @@ router.post('/claude/verify-custom-api', async (req, res) => {
       const err = await response.text();
       return res.status(response.status).json({ error: `Verification failed: ${err}` });
     }
+
+    return res.status(400).json({ error: 'Failed to verify custom API token' });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 
