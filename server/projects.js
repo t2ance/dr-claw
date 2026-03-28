@@ -1846,7 +1846,7 @@ async function getSessionMessages(projectName, sessionId, limit = null, offset =
             messages.push({
               type: 'tool_result',
               role: 'tool',
-              content: entry.content,
+              output: entry.content,
               tool_call_id: entry.tool_call_id,
               toolCallId: entry.tool_call_id,
               timestamp: entry.ts,
