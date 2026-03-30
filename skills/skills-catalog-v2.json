@@ -1,7 +1,7 @@
 {
   "generatedAt": "2026-03-24T17:51:17.721Z",
   "schema": "skills-taxonomy-v2",
-  "totalSkills": 112,
+  "totalSkills": 115,
   "skills": [
     {
       "name": "academic-researcher",
@@ -5143,6 +5143,141 @@
         "nemo-curator",
         "ray-data",
         "slime-rl-training"
+      ]
+    },
+    {
+      "name": "theoretical-backing",
+      "primaryIntent": "research",
+      "intents": [
+        "research",
+        "writing"
+      ],
+      "capabilities": [
+        "theory-analysis",
+        "literature-search"
+      ],
+      "domains": [
+        "cs-ai"
+      ],
+      "keywords": [
+        "theoretical-backing",
+        "theory",
+        "theorem",
+        "proof",
+        "bound",
+        "justification",
+        "information-bottleneck",
+        "scaling-law",
+        "pac-bayes",
+        "generalization",
+        "convergence",
+        "formal-verification",
+        "lean",
+        "nlp",
+        "llm",
+        "theoretical-analysis"
+      ],
+      "source": "imported",
+      "status": "verified",
+      "summary": "Provide theoretical justification for NLP/LLM research methods. Identifies relevant theoretical frameworks, searches literature via paper-finder, constructs formal justifications, maps experimental results to theoretical predictions, and generates paper-ready LaTeX sections. Supports optional Lean 4 formal verification.",
+      "legacy": {
+        "dirPath": "theoretical-backing",
+        "skillFile": "skills/theoretical-backing/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "Publication",
+        "domain": "cs"
+      },
+      "owner": "dr-claw",
+      "relatedSkills": [
+        "paper-finder",
+        "ml-paper-writing",
+        "scientific-writing",
+        "academic-researcher",
+        "inno-paper-writing"
+      ]
+    },
+    {
+      "name": "decision-clarity",
+      "primaryIntent": "research",
+      "intents": [
+        "research",
+        "planning"
+      ],
+      "capabilities": [
+        "decision-analysis",
+        "reasoning"
+      ],
+      "domains": [
+        "general"
+      ],
+      "keywords": [
+        "decision-clarity",
+        "decision",
+        "clarity",
+        "first-principles",
+        "socratic",
+        "simplify",
+        "assumptions",
+        "reasoning",
+        "audit",
+        "occam",
+        "reframe",
+        "bottleneck",
+        "tradeoff"
+      ],
+      "source": "imported",
+      "status": "verified",
+      "summary": "Improve decision quality by clarifying the real problem, exposing hidden assumptions, reasoning from fundamental facts, reducing unnecessary complexity, and ending with a cleaner recommendation or next step.",
+      "legacy": {
+        "dirPath": "decision-clarity",
+        "skillFile": "skills/decision-clarity/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "General",
+        "domain": "general"
+      },
+      "owner": "dr-claw",
+      "relatedSkills": [
+        "team-decision-review"
+      ]
+    },
+    {
+      "name": "team-decision-review",
+      "primaryIntent": "research",
+      "intents": [
+        "research",
+        "planning"
+      ],
+      "capabilities": [
+        "decision-analysis",
+        "reasoning",
+        "agent-workflow"
+      ],
+      "domains": [
+        "general"
+      ],
+      "keywords": [
+        "team-decision-review",
+        "team",
+        "review",
+        "challenge",
+        "design-review",
+        "socratic",
+        "decision",
+        "proposal"
+      ],
+      "source": "imported",
+      "status": "verified",
+      "summary": "Spawn a teammate to challenge your design proposal using the decision-clarity Socratic questioning methodology. Use when you have a design proposal, architecture decision, or implementation plan that needs rigorous review.",
+      "legacy": {
+        "dirPath": "team-decision-review",
+        "skillFile": "skills/team-decision-review/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "General",
+        "domain": "general"
+      },
+      "owner": "dr-claw",
+      "relatedSkills": [
+        "decision-clarity"
       ]
     }
   ]
