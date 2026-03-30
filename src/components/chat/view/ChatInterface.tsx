@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import ChatMessagesPane from './subcomponents/ChatMessagesPane';
 import ChatComposer from './subcomponents/ChatComposer';
 import SkillShortcutsPanel from './subcomponents/SkillShortcutsPanel';
+import ChatContextSidebar from './subcomponents/ChatContextSidebar';
 import { RESUMING_STATUS_TEXT } from '../types/types';
 import type { ChatInterfaceProps } from '../types/types';
 import type { ProviderAvailability } from '../types/types';
@@ -32,7 +33,6 @@ const DEFAULT_PROVIDER_AVAILABILITY: Record<Provider, ProviderAvailability> = {
 };
 
 const INTAKE_GREETING = `Hello! I'm your Dr. Claw research assistant, here to help you set up your research pipeline.\n\nTo get started, could you tell me about your research field or topic?`;
-const WORKSPACE_QA_GREETING = `Ask about any file, module, or implementation detail in this workspace. I will stay focused on code and project structure unless you explicitly ask to start research planning.`;
 
 const getAutoIntakePrompt = (pendingAutoIntake?: PendingAutoIntake | null) => {
   const prompt = pendingAutoIntake?.prompt?.trim();
@@ -199,6 +199,10 @@ function ChatInterface({
     isTextareaExpanded,
     thinkingMode,
     setThinkingMode,
+    codexReasoningEffort,
+    setCodexReasoningEffort,
+    geminiThinkingMode,
+    setGeminiThinkingMode,
     slashCommandsCount,
     filteredCommands,
     frequentCommands,
@@ -655,7 +659,8 @@ function ChatInterface({
 
   return (
     <>
-      <div className="h-full flex flex-col">
+      <div className="h-full flex min-h-0 flex-col xl:flex-row">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {shouldShowImportedProjectAnalysisPrompt && (
           <div className="mx-auto mt-4 w-full max-w-3xl px-3 sm:px-4">
             <div className="rounded-xl border border-border bg-card/95 shadow-sm px-4 py-4 sm:px-5">
@@ -799,8 +804,14 @@ function ChatInterface({
           provider={provider}
           permissionMode={permissionMode}
           onModeSwitch={cyclePermissionMode}
+          codexModel={codexModel}
+          geminiModel={geminiModel}
           thinkingMode={thinkingMode}
           setThinkingMode={setThinkingMode}
+          codexReasoningEffort={codexReasoningEffort}
+          setCodexReasoningEffort={setCodexReasoningEffort}
+          geminiThinkingMode={geminiThinkingMode}
+          setGeminiThinkingMode={setGeminiThinkingMode}
           tokenBudget={tokenBudget}
           slashCommandsCount={slashCommandsCount}
           onToggleCommandMenu={handleToggleCommandMenu}
@@ -855,6 +866,18 @@ function ChatInterface({
           onUpdateAttachedPrompt={(text) =>
             setAttachedPrompt((prev) => prev ? { ...prev, promptText: text } : null)
           }
+        />
+
+        </div>
+
+        <ChatContextSidebar
+          selectedProject={selectedProject}
+          selectedSession={selectedSession}
+          currentSessionId={currentSessionId}
+          provider={provider}
+          newSessionMode={newSessionMode}
+          chatMessages={chatMessages}
+          onFileOpen={onFileOpen}
         />
       </div>
 
