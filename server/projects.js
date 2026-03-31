@@ -2967,7 +2967,7 @@ async function addProjectManually(projectPath, displayName = null, userId = null
   // Check if a project with this path already exists under a different ID
   // (e.g., CLI uses '-Users-john-myproject' but manual add encodes as
   // '-Users-john-myproject'). Prevents duplicates from different encodings. See #86.
-  const existing = projectDb.getProjectByPath(absolutePath);
+  const existing = projectDb.getProjectByPath(absolutePath, userId ?? null);
   const effectiveId = existing ? existing.id : projectName;
 
   projectDb.upsertProject(effectiveId, userId, displayName, absolutePath, 0, new Date().toISOString(), { manuallyAdded: true });
