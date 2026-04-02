@@ -22,7 +22,7 @@ import type { GeminiThinkingModeId } from '../../../../shared/geminiThinkingSupp
 import { getSupportedGeminiThinkingModes } from '../../../../shared/geminiThinkingSupport';
 
 import { grantToolPermission } from '../utils/chatPermissions';
-import { getProviderSettingsKey, persistSessionTimerStart, safeLocalStorage } from '../utils/chatStorage';
+import { clearSessionTimerStart, getProviderSettingsKey, persistSessionTimerStart, safeLocalStorage } from '../utils/chatStorage';
 import { consumeWorkspaceQaDraft, WORKSPACE_QA_DRAFT_EVENT } from '../../../utils/workspaceQa';
 import { consumeReferenceChatDraft, REFERENCE_CHAT_DRAFT_EVENT } from '../../../utils/referenceChatDraft';
 import type {
@@ -57,6 +57,7 @@ interface UseChatComposerStateArgs {
   codexModel: string;
   geminiModel: string;
   openrouterModel: string;
+  localModel: string;
   isLoading: boolean;
   canAbortSession: boolean;
   tokenBudget: TokenBudget | null;
@@ -201,6 +202,7 @@ export function useChatComposerState({
   codexModel,
   geminiModel,
   openrouterModel,
+  localModel,
   isLoading,
   canAbortSession,
   tokenBudget,
@@ -1129,6 +1131,28 @@ export function useChatComposerState({
             stageTagSource: 'task_context',
           },
         });
+      } else if (provider === 'local') {
+        console.log('[DEBUG] Sending local-command');
+        sendMessage({
+          type: 'local-command',
+          command: messageContent,
+          sessionId: effectiveSessionId,
+          options: {
+            cwd: resolvedProjectPath,
+            projectPath: resolvedProjectPath,
+            sessionId: effectiveSessionId,
+            resume: Boolean(effectiveSessionId),
+            model: localModel,
+            serverUrl: localStorage.getItem('local-gpu-server-url') || 'http://localhost:11434',
+            gpuId: localStorage.getItem('local-gpu-selected') || undefined,
+            permissionMode,
+            toolsSettings,
+            telemetryEnabled,
+            sessionMode: isNewSession ? newSessionMode : selectedSession?.mode,
+            stageTagKeys: pendingStageTagKeys,
+            stageTagSource: 'task_context',
+          },
+        });
       } else {
         console.log('[DEBUG] Sending claude-command');
         sendMessage({
@@ -1180,6 +1204,7 @@ export function useChatComposerState({
       geminiThinkingMode,
       geminiModel,
       openrouterModel,
+      localModel,
       isLoading,
       onSessionActive,
       pendingViewSessionRef,
@@ -1426,6 +1451,16 @@ export function useChatComposerState({
 
   const handleAbortSession = useCallback(() => {
     if (!canAbortSession) {
+      // Force-reset the UI when Stop is clicked but no active abort is possible.
+      // This handles stale state after server restarts or lost WebSocket connections.
+      if (isLoading) {
+        setIsLoading(false);
+        setCanAbortSession(false);
+        setClaudeStatus(null);
+        setPendingPermissionRequests([]);
+        const sessionId = currentSessionId || selectedSession?.id;
+        if (sessionId) clearSessionTimerStart(sessionId);
+      }
       return;
     }
 
@@ -1475,8 +1510,9 @@ export function useChatComposerState({
       setIsLoading(false);
       setCanAbortSession(false);
       setClaudeStatus(null);
+      if (targetSessionId) clearSessionTimerStart(targetSessionId);
     }, 5000);
-  }, [canAbortSession, currentSessionId, pendingViewSessionRef, provider, selectedSession?.id, sendMessage, setCanAbortSession, setChatMessages, setClaudeStatus, setIsLoading]);
+  }, [canAbortSession, currentSessionId, isLoading, pendingViewSessionRef, provider, selectedSession?.id, sendMessage, setCanAbortSession, setChatMessages, setClaudeStatus, setIsLoading, setPendingPermissionRequests]);
 
   const handleTranscript = useCallback((text: string) => {
     if (!text.trim()) {
