@@ -2765,7 +2765,7 @@ function ResearchLab({ selectedProject, onNavigateToChat, compact = false, onFil
           )}
           <div className="min-w-0">
             <div className={`font-medium text-foreground ${compact ? 'text-sm' : ''}`}>
-              {compact ? projectTitle : (t('tabs.researchLab') || 'Research Lab')}
+              {t('tabs.researchLab') || 'Research Lab'}
             </div>
             {!compact && (
               <div className="truncate text-xs text-muted-foreground">
@@ -2816,11 +2816,9 @@ function ResearchLab({ selectedProject, onNavigateToChat, compact = false, onFil
                     Live Research Workspace
                   </div>
                 )}
-                {!compact && (
-                  <h2 className="mt-4 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-                    {projectTitle}
-                  </h2>
-                )}
+                <h2 className={`font-semibold tracking-tight text-foreground ${compact ? 'text-base' : 'mt-4 text-3xl sm:text-4xl'}`}>
+                  {projectTitle}
+                </h2>
                 {!compact && (
                   <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">
                     Track every stage of the research pipeline, review generated artifacts, and jump back into execution without leaving the lab view.
