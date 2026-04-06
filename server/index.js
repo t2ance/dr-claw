@@ -282,15 +282,6 @@ const server = http.createServer(app);
 const ptySessionsMap = new Map();
 const PTY_SESSION_TIMEOUT = 30 * 60 * 1000;
 const SHELL_URL_PARSE_BUFFER_LIMIT = 32768;
-
-function safePtyKill(session, sessionKey) {
-    if (!session?.pty?.kill) return;
-    try {
-        session.pty.kill();
-    } catch (err) {
-        console.warn(`⚠️ Failed to kill PTY process (${sessionKey}):`, err.message);
-    }
-}
 const ANSI_ESCAPE_SEQUENCE_REGEX = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1B\\))/g;
 const TRAILING_URL_PUNCTUATION_REGEX = /[)\]}>.,;:!?]+$/;
 const REPLAY_TERMINAL_QUERY_REGEXES = [
@@ -306,6 +297,15 @@ const SHELL_EMBEDDED_ENV_KEYS_TO_REMOVE = [
     'LC_TERMINAL_VERSION',
     'WT_SESSION',
 ];
+
+function safePtyKill(session, sessionKey) {
+    if (!session?.pty?.kill) return;
+    try {
+        session.pty.kill();
+    } catch (err) {
+        console.warn(`⚠️ Failed to kill PTY process (${sessionKey}):`, err);
+    }
+}
 
 function stripAnsiSequences(value = '') {
     return value.replace(ANSI_ESCAPE_SEQUENCE_REGEX, '');
