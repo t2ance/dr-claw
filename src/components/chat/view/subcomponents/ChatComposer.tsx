@@ -515,7 +515,7 @@ export default function ChatComposer({
 
             {!centered && (
               <div
-                className={`absolute bottom-1 ${projectName ? 'left-[5.5rem]' : 'left-12'} right-14 sm:right-40 text-xs text-muted-foreground/50 pointer-events-none hidden sm:block transition-opacity duration-200 ${
+                className={`absolute bottom-1 left-5 right-14 sm:right-40 text-xs text-muted-foreground/50 pointer-events-none hidden sm:block transition-opacity duration-200 ${
                   input.trim() ? 'opacity-0' : 'opacity-100'
                 }`}
               >
